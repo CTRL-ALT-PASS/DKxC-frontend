@@ -24,7 +24,7 @@ export default function LoginScreen() {
 
   const handleLogin = () => {
     if (employeeId === CURRENT_USER.employeeId && pin === CURRENT_USER.pin) {
-      router.replace("/(tabs)");
+      router.replace("/(pos)");
     } else {
       setError("Invalid employee ID or PIN");
     }
