@@ -7,8 +7,15 @@ import ProductCard from "@/components/ProductCard";
 import ProductOptionsModal from "@/components/ProductOptionsModal";
 import TextField from "@/components/TextField";
 import { useCart } from "@/context/CartContext";
+import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import {
+  FlatList,
+  Pressable,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import {
   CATEGORIES,
   CURRENT_USER,
@@ -17,13 +24,27 @@ import {
   type Product,
 } from "../../constants/mockData";
 
+const SIDEBAR_WIDTH = 64;
+const GRID_PADDING = 24;
+const CARD_GAP = 16;
+const MAX_CARD_WIDTH = 160;
+
 export default function POSScreen() {
+  const router = useRouter();
+  const { width } = useWindowDimensions();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Menu");
-  const [orderType, setOrderType] = useState<"Dine In" | "Take out">("Dine In");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
-  const { items, list, total, dispatch } = useCart();
+  const { items, list, total, orderType, dispatch } = useCart();
   const isCartEmpty = list.length === 0;
+
+  const numColumns = width < 700 ? 2 : width < 1000 ? 3 : 5;
+  const summaryWidth = Math.min(320, Math.max(220, Math.round(width * 0.22)));
+  const gridAreaWidth = width - SIDEBAR_WIDTH - summaryWidth - GRID_PADDING * 2;
+  const cardWidth = Math.min(
+    MAX_CARD_WIDTH,
+    Math.floor((gridAreaWidth - CARD_GAP * (numColumns - 1)) / numColumns),
+  );
 
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -40,6 +61,13 @@ export default function POSScreen() {
       );
     });
   }, [search, category]);
+
+  const chooseOrderType = (type: "Dine In" | "Take out") => {
+    dispatch({ type: "SET_ORDER_TYPE", orderType: type });
+    if (!isCartEmpty) {
+      router.navigate("/checkout");
+    }
+  };
 
   return (
     <View className="flex-1 bg-cream">
@@ -69,14 +97,16 @@ export default function POSScreen() {
           </View>
 
           <FlatList
+            key={`cols-${numColumns}`}
             data={filtered}
-            numColumns={4}
+            numColumns={numColumns}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <ProductCard
                 product={item}
                 quantity={items[item.id]?.quantity || 0}
                 addIcon={addIcon}
+                cardWidth={cardWidth}
                 onIncrease={() => dispatch({ type: "ADD", product: item })}
                 onDecrease={() => dispatch({ type: "DECREASE", key: item.id })}
                 onOpenSpecs={() => setActiveProduct(item)}
@@ -85,7 +115,10 @@ export default function POSScreen() {
           />
         </View>
 
-        <View className="w-72 bg-white p-6 border-l border-slate-200">
+        <View
+          style={{ width: summaryWidth }}
+          className="bg-white p-6 border-l border-slate-200"
+        >
           <Text className="text-lg font-semibold text-darcy mb-4">Summary</Text>
           {list.map((entry) => (
             <View key={entry.key} className="flex-row justify-between mb-2">
@@ -111,7 +144,7 @@ export default function POSScreen() {
           <View className="mt-auto pt-4 border-t border-slate-200">
             <View className="flex-row gap-2 mb-4">
               <Pressable
-                onPress={() => setOrderType("Dine In")}
+                onPress={() => chooseOrderType("Dine In")}
                 className={`flex-1 py-2 rounded-xl items-center justify-center ${
                   orderType === "Dine In"
                     ? "bg-darcy"
@@ -126,7 +159,7 @@ export default function POSScreen() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => setOrderType("Take out")}
+                onPress={() => chooseOrderType("Take out")}
                 className={`flex-1 py-2 rounded-xl items-center justify-center ${
                   orderType === "Take out"
                     ? "bg-darcy"

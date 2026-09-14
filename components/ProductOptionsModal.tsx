@@ -1,15 +1,21 @@
+import { getUnitPrice, type Product } from "@/constants/mockData";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { getUnitPrice, type Product } from "../constants/mockData";
 
 interface ProductOptionsModalProps {
   product: Product | null;
   visible: boolean;
   onClose: () => void;
   onConfirm: (options: Record<string, string>) => void;
+  initialOptions?: Record<string, string>;
+  confirmLabel?: string;
 }
 
-function getDefaultSelections(product: Product | null): Record<string, string> {
+function getDefaultSelections(
+  product: Product | null,
+  initialOptions?: Record<string, string>,
+): Record<string, string> {
+  if (initialOptions) return initialOptions;
   const defaults: Record<string, string> = {};
   product?.specs?.forEach((group) => {
     defaults[group.key] = group.options[0].label;
@@ -22,9 +28,14 @@ export default function ProductOptionsModal({
   visible,
   onClose,
   onConfirm,
+  initialOptions,
+  confirmLabel = "Confirm",
 }: ProductOptionsModalProps) {
+  // Lazy initializer runs once per mount. The parent remounts this component
+  // (via a `key`) every time a different product/entry opens, so this resets
+  // to the right starting selections naturally, with no effect needed.
   const [selections, setSelections] = useState<Record<string, string>>(() =>
-    getDefaultSelections(product),
+    getDefaultSelections(product, initialOptions),
   );
 
   if (!product) return null;
@@ -100,7 +111,7 @@ export default function ProductOptionsModal({
             className="bg-darcy rounded-xl py-4 items-center mt-2"
           >
             <Text className="text-white text-lg font-semibold">
-              Confirm — ₱{previewPrice.toFixed(2)}
+              {confirmLabel} — ₱{previewPrice.toFixed(2)}
             </Text>
           </Pressable>
         </View>
