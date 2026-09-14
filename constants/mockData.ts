@@ -32,6 +32,13 @@ export const CURRENT_USER: User = {
   avatar: require("../assets/images/avatar.png"),
 };
 
+export const ADMIN_USER: User = {
+  employeeId: "DCY-002",
+  pin: "54321",
+  name: "Joshua David",
+  avatar: require("../assets/images/avatar.png"),
+};
+
 export const CATEGORIES = ["All Menu", "Coffee", "Non-Coffee", "Pastries", "Tea"];
 
 export const PRODUCTS: Product[] = [
@@ -40,7 +47,7 @@ export const PRODUCTS: Product[] = [
   { id: "p3", name: "Mocha Latte", price: 120, category: "Coffee", image: require("@/assets/images/mocha-latte.png") },
   { id: "p4", name: "Matcha", price: 120, category: "Non-Coffee", image: require("@/assets/images/matcha.png") },
   { id: "p5", name: "Egg Pie", price: 40, category: "Pastries", image: require("@/assets/images/egg-pie.png") },
-  { id: "p6", name: "Egg Pie", price: 40, category: "Pastries", image: require("@/assets/images/egg-pie.png") },
+  { id: "p6", name: "Egg Pie", price: 40, category: "Pastries", image: require("@/assets/images/egg-pie.png"), available: 0 },
 ];
 
 export const LOW_STOCK_THRESHOLD = 5;

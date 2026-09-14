@@ -11,7 +11,7 @@ import mailIcon from "../assets/icons/mail.png";
 import logoLight from "../assets/images/darcys-logo-light.png";
 import Button from "../components/Button";
 import TextField from "../components/TextField";
-import { CURRENT_USER } from "../constants/mockData";
+import { CURRENT_USER, ADMIN_USER } from "../constants/mockData";
 
 cssInterop(LinearGradient, { className: "style" });
 
@@ -25,6 +25,8 @@ export default function LoginScreen() {
   const handleLogin = () => {
     if (employeeId === CURRENT_USER.employeeId && pin === CURRENT_USER.pin) {
       router.replace("/(pos)");
+    } else if (employeeId === ADMIN_USER.employeeId && pin === ADMIN_USER.pin) {
+      router.replace("/(inventory)/dashboard")
     } else {
       setError("Invalid employee ID or PIN");
     }
