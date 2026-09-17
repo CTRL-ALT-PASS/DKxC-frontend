@@ -13,6 +13,12 @@ interface CartItemCardProps {
   cardWidth?: number;
 }
 
+// Exported so checkout.tsx can size its "+" card to match exactly, even
+// though that card has no image/name/price/stepper of its own to measure.
+export function getCartCardHeight(cardWidth: number): number {
+  return Math.round(cardWidth * 0.75) + 140;
+}
+
 export default function CartItemCard({
   entry,
   menuIcon,
@@ -23,10 +29,11 @@ export default function CartItemCard({
 }: CartItemCardProps) {
   const hasSpecs = !!entry.product.specs?.length;
   const unitPrice = getUnitPrice(entry.product, entry.options);
+  const imageHeight = Math.round(cardWidth * 0.75);
 
   return (
     <View
-      style={{ width: cardWidth }}
+      style={{ width: cardWidth, height: getCartCardHeight(cardWidth) }}
       className="bg-white rounded-2xl p-3 mr-4 mb-4"
     >
       <View>
@@ -34,7 +41,7 @@ export default function CartItemCard({
           source={entry.product.image}
           style={{
             width: "100%",
-            height: Math.round(cardWidth * 0.75),
+            height: imageHeight,
             borderRadius: 12,
             marginBottom: 8,
           }}
@@ -53,18 +60,24 @@ export default function CartItemCard({
           </Pressable>
         )}
       </View>
-      <Text className="font-semibold text-slate-800">{entry.product.name}</Text>
+      <Text className="font-semibold text-slate-800" numberOfLines={1}>
+        {entry.product.name}
+      </Text>
       <Text className="text-slate-500 mb-1">₱{unitPrice.toFixed(2)}</Text>
       {entry.options && (
         <Text className="text-xs text-slate-500 mb-2" numberOfLines={1}>
           {Object.values(entry.options).join(", ")}
         </Text>
       )}
-      <QuantityStepper
-        quantity={entry.quantity}
-        onIncrease={onIncrease}
-        onDecrease={onDecrease}
-      />
+      {/* Pins the stepper to the bottom regardless of whether the options
+          line above exists, so every card's stepper lands at the same spot. */}
+      <View style={{ marginTop: "auto" }}>
+        <QuantityStepper
+          quantity={entry.quantity}
+          onIncrease={onIncrease}
+          onDecrease={onDecrease}
+        />
+      </View>
     </View>
   );
 }
