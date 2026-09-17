@@ -1,14 +1,15 @@
-import { View, Image, Pressable } from "react-native";
-import { usePathname, router } from "expo-router";
+import logo from "@/assets/icons/darcy-mark.png";
+import { router, usePathname } from "expo-router";
+import { Image, Pressable, View } from "react-native";
+
 import {
-  LayoutDashboard,
   Activity,
   ClipboardList,
-  ShoppingBag,
-  Package,
-  Users,
   LogOut,
-  type LucideIcon,
+  Package,
+  ShoppingBag,
+  Users,
+  type LucideIcon
 } from "lucide-react-native";
 
 interface NavItem {
@@ -54,14 +55,13 @@ export default function InventorySidebar() {
       {/* Logo + Navigation */}
       <View className="items-center w-full">
 
-        {/* Company Logo */}
-        <View className="w-12 h-12 items-center justify-center mb-5">
-          <Image
-            source={require("@/assets/images/darcys-logo-light-cropped.png")}
-            className="w-10 h-10"
-            resizeMode="contain"
-          />
-        </View>
+      <View className="mb-6 items-center justify-center">
+        <Image
+          source={logo}
+          style={{ width: 40, height: 40 }}
+          resizeMode="contain"
+        />
+      </View>
 
         {/* Navigation */}
         <View className="w-full items-center">

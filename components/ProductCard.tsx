@@ -1,8 +1,8 @@
-import { View, Text, Pressable, ImageSourcePropType } from "react-native";
+import type { Product } from "@/constants/mockData";
 import { Image } from "expo-image";
+import { ImageSourcePropType, Pressable, Text, View } from "react-native";
 import Badge from "./Badge";
 import QuantityStepper from "./QuantityStepper";
-import type { Product } from "../constants/mockData";
 
 interface ProductCardProps {
   product: Product;
@@ -10,27 +10,57 @@ interface ProductCardProps {
   addIcon: ImageSourcePropType;
   onIncrease: () => void;
   onDecrease: () => void;
+  onOpenSpecs?: () => void;
+  cardWidth?: number;
 }
 
-export default function ProductCard({ product, quantity = 0, addIcon, onIncrease, onDecrease }: ProductCardProps) {
+export default function ProductCard({
+  product,
+  quantity = 0,
+  addIcon,
+  onIncrease,
+  onDecrease,
+  onOpenSpecs,
+  cardWidth = 100,
+}: ProductCardProps) {
+  const hasSpecs = !!product.specs?.length;
+
   return (
-    <View className="bg-white rounded-2xl p-3 w-40 mr-4 mb-4">
-      <Image
-        source={product.image}
-        style={{ width: "100%", height: 124, borderRadius: 12, marginBottom: 8 }}
-        contentFit="cover"
-      />
-      <Text className="font-semibold text-slate-800">{product.name}</Text>
-      <Text className="text-slate-500 mb-2">₱{product.price.toFixed(2)}</Text>
-      <View className="flex-row items-center justify-between">
-        <Badge label={product.category} />
-        {quantity === 0 && (
-          <Pressable onPress={onIncrease}>
-            <Image source={addIcon} style={{ width: 20, height: 20 }} contentFit="contain" />
-          </Pressable>
+    <Pressable onPress={hasSpecs ? onOpenSpecs : onIncrease}>
+      <View
+        style={{ width: cardWidth }}
+        className="bg-white rounded-2xl p-3 mr-4 mb-4"
+      >
+        <Image
+          source={product.image}
+          style={{
+            width: "100%",
+            height: Math.round(cardWidth * 0.8),
+            borderRadius: 12,
+            marginBottom: 8,
+          }}
+          contentFit="cover"
+        />
+        <Text className="font-semibold text-slate-800">{product.name}</Text>
+        <Text className="text-slate-500 mb-2">₱{product.price.toFixed(2)}</Text>
+        <View className="flex-row items-center justify-between">
+          <Badge label={product.category} />
+          {(hasSpecs || quantity === 0) && (
+            <Image
+              source={addIcon}
+              style={{ width: 15, height: 20 }}
+              contentFit="contain"
+            />
+          )}
+        </View>
+        {!hasSpecs && quantity > 0 && (
+          <QuantityStepper
+            quantity={quantity}
+            onIncrease={onIncrease}
+            onDecrease={onDecrease}
+          />
         )}
       </View>
-      {quantity > 0 && <QuantityStepper quantity={quantity} onIncrease={onIncrease} onDecrease={onDecrease} />}
-    </View>
+    </Pressable>
   );
 }
