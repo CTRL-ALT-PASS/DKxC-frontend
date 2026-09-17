@@ -1,17 +1,17 @@
-import eyeOffIcon from "@/assets/icons/eye-off.png";
-import eyeIcon from "@/assets/icons/eye.png";
-import lockIcon from "@/assets/icons/lock.png";
-import mailIcon from "@/assets/icons/mail.png";
-import logo from "@/assets/images/darcys-logo.png";
-import Button from "@/components/Button";
-import TextField from "@/components/TextField";
-import { CURRENT_USER } from "@/constants/mockData";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useState } from "react";
 import { Text, View } from "react-native";
+import eyeOffIcon from "../assets/icons/eye-off.png";
+import eyeIcon from "../assets/icons/eye.png";
+import lockIcon from "../assets/icons/lock.png";
+import mailIcon from "../assets/icons/mail.png";
+import logoLight from "../assets/images/darcys-logo-light.png";
+import Button from "../components/Button";
+import TextField from "../components/TextField";
+import { ADMIN_USER, CURRENT_USER } from "../constants/mockData";
 
 cssInterop(LinearGradient, { className: "style" });
 
@@ -24,22 +24,17 @@ export default function LoginScreen() {
 
   const handleLogin = () => {
     if (employeeId === CURRENT_USER.employeeId && pin === CURRENT_USER.pin) {
-      router.replace("/(tabs)");
+      router.replace("/(pos)/menu");
+    } else if (employeeId === ADMIN_USER.employeeId && pin === ADMIN_USER.pin) {
+      router.replace("/(inventory)/dashboard")
     } else {
       setError("Invalid employee ID or PIN");
     }
   };
 
   return (
-    <LinearGradient
-      colors={["#2F5A3F", "#14291C"]}
-      className="flex-1 items-center justify-center px-6"
-    >
-      <Image
-        source={logo}
-        style={{ width: 140, height: 140, marginBottom: 32 }}
-        contentFit="contain"
-      />
+    <LinearGradient colors={["#2F5A3F", "#14291C"]} className="flex-1 items-center justify-center px-6">
+      <Image source={logoLight} style={{ width: 140, height: 140, marginBottom: 32 }} contentFit="contain" />
       <View className="bg-slate-100 rounded-2xl p-6 w-full max-w-sm">
         <Text className="text-center text-lg font-bold mb-4">LOGIN</Text>
 

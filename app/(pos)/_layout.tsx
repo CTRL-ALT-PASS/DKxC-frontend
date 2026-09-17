@@ -14,8 +14,8 @@ export default function TabsLayout() {
     {
       key: "order",
       icon: gridIcon,
-      isActive: pathname === "/",
-      onPress: () => router.navigate("/"),
+      isActive: pathname === "/menu",
+      onPress: () => router.navigate("/menu "),
     },
     {
       key: "checkout",

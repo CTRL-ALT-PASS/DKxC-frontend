@@ -165,7 +165,15 @@ export const PRODUCTS: Product[] = [
     category: "Pastries",
     image: require("@/assets/images/egg-pie.png"),
   },
-];
+]
+  
+export const ADMIN_USER: User = {
+  employeeId: "DCY-002",
+  pin: "54321",
+  name: "Joshua David",
+  avatar: require("../assets/images/avatar.png"),
+};
+
 
 // One unit's real price once its selected options are factored in. Products
 // with no specs (or calls with no options) just return the plain base price.
