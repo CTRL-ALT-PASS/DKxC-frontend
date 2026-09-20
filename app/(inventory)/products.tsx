@@ -3,11 +3,13 @@ import { View, Text, FlatList, Pressable } from "react-native";
 import { Search, SlidersHorizontal, Plus, Pencil } from "lucide-react-native";
 import TextField from "../../components/TextField";
 import InventoryProductCard from "../../components/inventory/products/InventoryProductCard";
-import { PRODUCTS, CATEGORIES } from "../../constants/mockData";
+import AddProductModal, { ProductFormData } from "../../components/inventory/products/AddProductModal";
+import { PRODUCTS, CATEGORIES, INVENTORY } from "../../constants/mockData";
 
 export default function ProductsScreen() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Menu");
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
 
   const filtered = useMemo(() => {
     return PRODUCTS.filter((p) => {
@@ -15,6 +17,11 @@ export default function ProductsScreen() {
       return matchesCategory && p.name.toLowerCase().includes(search.toLowerCase());
     });
   }, [search, category]);
+
+  const handleAddProduct = (data: ProductFormData) => {
+    console.log("New product:", data);
+    setIsAddModalVisible(false);
+  };
 
   return (
     <View className="flex-1 bg-cream p-6">
@@ -30,10 +37,21 @@ export default function ProductsScreen() {
         </View>
 
         <View className="flex-row">
-          <Pressable className="flex-row items-center bg-darcy rounded-lg px-4 py-2 mr-3">
+          <Pressable
+            onPress={() => setIsAddModalVisible(true)}
+            className="flex-row items-center bg-darcy rounded-lg px-4 py-2 mr-3"
+          >
             <Plus size={18} color="#fff" />
             <Text className="text-white font-medium ml-2">Add product</Text>
           </Pressable>
+    
+          <AddProductModal
+            visible={isAddModalVisible}
+            onClose={() => setIsAddModalVisible(false)}
+            onSubmit={handleAddProduct}
+            categories={CATEGORIES}
+            inventoryItems={INVENTORY}
+          />
           <Pressable className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 py-2">
             <Pencil size={18} color="#334155" />
             <Text className="text-slate-700 font-medium ml-2">Edit categories</Text>
