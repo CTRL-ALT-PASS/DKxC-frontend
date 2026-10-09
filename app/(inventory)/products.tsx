@@ -1,15 +1,18 @@
 import { useState, useMemo } from "react";
 import { View, Text, FlatList, Pressable } from "react-native";
-import { Search, SlidersHorizontal, Plus, Pencil } from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { Search, Plus, Pencil } from "lucide-react-native";
 import TextField from "../../components/TextField";
 import InventoryProductCard from "../../components/inventory/products/InventoryProductCard";
-import AddProductModal, { ProductFormData } from "../../components/inventory/products/AddProductModal";
-import { PRODUCTS, CATEGORIES, INVENTORY } from "../../constants/mockData";
+import { PRODUCTS, CATEGORIES } from "../../constants/mockData";
+
+// Adjust to wherever you place the product-form route file.
+const PRODUCT_FORM_ROUTE = "/(inventory)/product-form";
 
 export default function ProductsScreen() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Menu");
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
 
   const filtered = useMemo(() => {
     return PRODUCTS.filter((p) => {
@@ -18,10 +21,10 @@ export default function ProductsScreen() {
     });
   }, [search, category]);
 
-  const handleAddProduct = (data: ProductFormData) => {
-    console.log("New product:", data);
-    setIsAddModalVisible(false);
-  };
+  const openAddProduct = () => router.push(PRODUCT_FORM_ROUTE as any);
+
+  const openEditProduct = (id: string) =>
+    router.push({ pathname: PRODUCT_FORM_ROUTE as any, params: { id } });
 
   return (
     <View className="flex-1 bg-cream p-6">
@@ -38,20 +41,13 @@ export default function ProductsScreen() {
 
         <View className="flex-row">
           <Pressable
-            onPress={() => setIsAddModalVisible(true)}
+            onPress={openAddProduct}
             className="flex-row items-center bg-darcy rounded-lg px-4 py-2 mr-3"
           >
             <Plus size={18} color="#fff" />
             <Text className="text-white font-medium ml-2">Add product</Text>
           </Pressable>
-    
-          <AddProductModal
-            visible={isAddModalVisible}
-            onClose={() => setIsAddModalVisible(false)}
-            onSubmit={handleAddProduct}
-            categories={CATEGORIES}
-            inventoryItems={INVENTORY}
-          />
+
           <Pressable className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 py-2">
             <Pencil size={18} color="#334155" />
             <Text className="text-slate-700 font-medium ml-2">Edit categories</Text>
@@ -81,9 +77,7 @@ export default function ProductsScreen() {
           <InventoryProductCard
             product={item}
             available={item.available ?? true}
-            onPress={() => {
-              // edit modal logic
-            }}
+            onPress={() => openEditProduct(item.id)}
           />
         )}
       />
