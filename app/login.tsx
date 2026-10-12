@@ -11,24 +11,33 @@ import mailIcon from "../assets/icons/mail.png";
 import logoLight from "../assets/images/darcys-logo-light.png";
 import Button from "../components/Button";
 import TextField from "../components/TextField";
-import { ADMIN_USER, CURRENT_USER } from "../constants/mockData";
+import { useAuth } from "../context/AuthContext";
+import { login } from "../services/authApi";
 
 cssInterop(LinearGradient, { className: "style" });
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { setUser } = useAuth();
   const [employeeId, setEmployeeId] = useState("");
   const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (employeeId === CURRENT_USER.employeeId && pin === CURRENT_USER.pin) {
-      router.replace("/(pos)/menu");
-    } else if (employeeId === ADMIN_USER.employeeId && pin === ADMIN_USER.pin) {
-      router.replace("/(inventory)/dashboard")
-    } else {
-      setError("Invalid employee ID or PIN");
+  const handleLogin = async () => {
+    if (loading) return; // ignore taps while a login is already in flight
+    setError("");
+    setLoading(true);
+    try {
+      const user = await login(employeeId, pin);
+      setUser(user);
+      // Cashiers land in the POS, admins land in the inventory dashboard.
+      router.replace(user.role === "admin" ? "/(inventory)/dashboard" : "/(pos)/menu");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,7 +70,7 @@ export default function LoginScreen() {
         />
 
         {!!error && <Text className="text-warn text-xs mt-2">{error}</Text>}
-        <Button label="Log In" onPress={handleLogin} className="mt-6" />
+        <Button label={loading ? "Logging in..." : "Log In"} onPress={handleLogin} className="mt-6" />
       </View>
     </LinearGradient>
   );

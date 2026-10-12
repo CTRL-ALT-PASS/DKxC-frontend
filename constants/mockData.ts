@@ -25,6 +25,7 @@ export interface Product {
   category: string;
   image: ImageSourcePropType;
   specs?: ProductSpecGroup[];
+  available?: boolean; // Indicates if the product is currently available for sale
 }
 
 export interface InventoryItem {
@@ -133,6 +134,7 @@ export const PRODUCTS: Product[] = [
     category: "Coffee",
     image: require("@/assets/images/americano.png"),
     specs: DRINK_SPECS,
+    available: true, // This product is currently available for sale
   },
   {
     id: "p2",
@@ -141,6 +143,7 @@ export const PRODUCTS: Product[] = [
     category: "Coffee",
     image: require("@/assets/images/cappuccino.png"),
     specs: DRINK_SPECS,
+    available: true, // This product is currently unavailable
   },
   {
     id: "p3",
@@ -149,6 +152,7 @@ export const PRODUCTS: Product[] = [
     category: "Coffee",
     image: require("@/assets/images/mocha-latte.png"),
     specs: DRINK_SPECS,
+    available: true, // This product is currently available for sale
   },
   {
     id: "p4",
@@ -157,6 +161,7 @@ export const PRODUCTS: Product[] = [
     category: "Non-Coffee",
     image: require("@/assets/images/matcha.png"),
     specs: DRINK_SPECS,
+    available: true, // This product is currently unavailable
   },
   {
     id: "p5",
@@ -164,16 +169,16 @@ export const PRODUCTS: Product[] = [
     price: 40,
     category: "Pastries",
     image: require("@/assets/images/egg-pie.png"),
+    available: true, // This product is currently available for sale
   },
-]
-  
+];
+
 export const ADMIN_USER: User = {
   employeeId: "DCY-002",
   pin: "54321",
   name: "Joshua David",
   avatar: require("../assets/images/avatar.png"),
 };
-
 
 // One unit's real price once its selected options are factored in. Products
 // with no specs (or calls with no options) just return the plain base price.
