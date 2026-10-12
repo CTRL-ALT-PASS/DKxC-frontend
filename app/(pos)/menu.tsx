@@ -1,13 +1,3 @@
-import addIcon from "@/assets/icons/basket-add.png";
-import chevronIcon from "@/assets/icons/chevron-down.png";
-import searchIcon from "@/assets/icons/search.png";
-import CategoryDropdown from "@/components/CategoryDropdown";
-import Header from "@/components/Header";
-import ProductCard from "@/components/ProductCard";
-import ProductOptionsModal from "@/components/ProductOptionsModal";
-import TextField from "@/components/TextField";
-import { useCart } from "@/context/CartContext";
-import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   FlatList,
@@ -16,13 +6,19 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import {
-  CATEGORIES,
-  CURRENT_USER,
-  getUnitPrice,
-  PRODUCTS,
-  type Product,
-} from "../../constants/mockData";
+import addIcon from "../../assets/icons/basket-add.png";
+import chevronIcon from "../../assets/icons/chevron-down.png";
+import searchIcon from "../../assets/icons/search.png";
+import CategoryDropdown from "../../components/CategoryDropdown";
+import Header from "../../components/Header";
+import PaymentModeModal from "../../components/PaymentModeModal";
+import ProductCard from "../../components/ProductCard";
+import ProductOptionsModal from "../../components/ProductOptionsModal";
+import TextField from "../../components/TextField";
+import { getUnitPrice, type Product } from "../../constants/mockData";
+import { useAuth } from "../../context/AuthContext";
+import { useCart, type PaymentMode } from "../../context/CartContext";
+import { useProducts } from "../../hooks/use-products";
 
 const SIDEBAR_WIDTH = 64;
 const GRID_PADDING = 24;
@@ -30,15 +26,23 @@ const CARD_GAP = 16;
 const MAX_CARD_WIDTH = 160;
 
 export default function POSScreen() {
-  const router = useRouter();
   const { width } = useWindowDimensions();
+  const { user } = useAuth();
+  const {
+    products,
+    categories,
+    loading: loadingMenu,
+    error: menuError,
+  } = useProducts();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Menu");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
-  const { items, list, total, orderType, dispatch } = useCart();
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const { items, list, total, orderType, dispatch, completeTransaction } =
+    useCart();
   const isCartEmpty = list.length === 0;
 
-  const numColumns = width < 700 ? 2 : width < 1000 ? 3 : 5;
+  const numColumns = width < 700 ? 2 : width < 1000 ? 3 : 4;
   const summaryWidth = Math.min(320, Math.max(220, Math.round(width * 0.22)));
   const gridAreaWidth = width - SIDEBAR_WIDTH - summaryWidth - GRID_PADDING * 2;
   const cardWidth = Math.min(
@@ -53,28 +57,36 @@ export default function POSScreen() {
   });
 
   const filtered = useMemo(() => {
-    return PRODUCTS.filter((p) => {
+    return products.filter((p) => {
       const matchesCategory =
         category === "All Menu" || p.category === category;
       return (
         matchesCategory && p.name.toLowerCase().includes(search.toLowerCase())
       );
     });
-  }, [search, category]);
+  }, [products, search, category]);
 
   const chooseOrderType = (type: "Dine In" | "Take out") => {
     dispatch({ type: "SET_ORDER_TYPE", orderType: type });
     if (!isCartEmpty) {
-      router.navigate("/checkout");
+      setPaymentModalOpen(true);
     }
   };
+
+  const handlePaymentConfirm = (mode: PaymentMode) => {
+    completeTransaction(mode);
+    setPaymentModalOpen(false);
+  };
+
+  // This route is only reachable after logging in, so user is always set here.
+  if (!user) return null;
 
   return (
     <View className="flex-1 bg-cream">
       <Header
         title="Darcy's Kitchen & Cafe POS"
         date={today}
-        user={CURRENT_USER}
+        user={user}
         chevronIcon={chevronIcon}
       />
 
@@ -89,30 +101,36 @@ export default function POSScreen() {
               className="flex-1 mr-3"
             />
             <CategoryDropdown
-              categories={CATEGORIES}
+              categories={categories}
               selected={category}
               onSelect={setCategory}
               chevronIcon={chevronIcon}
             />
           </View>
 
-          <FlatList
-            key={`cols-${numColumns}`}
-            data={filtered}
-            numColumns={numColumns}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <ProductCard
-                product={item}
-                quantity={items[item.id]?.quantity || 0}
-                addIcon={addIcon}
-                cardWidth={cardWidth}
-                onIncrease={() => dispatch({ type: "ADD", product: item })}
-                onDecrease={() => dispatch({ type: "DECREASE", key: item.id })}
-                onOpenSpecs={() => setActiveProduct(item)}
-              />
-            )}
-          />
+          {loadingMenu ? (
+            <Text className="text-slate-400 mt-6">Loading menu...</Text>
+          ) : menuError ? (
+            <Text className="text-warn mt-6">{menuError}</Text>
+          ) : (
+            <FlatList
+              key={`cols-${numColumns}`}
+              data={filtered}
+              numColumns={numColumns}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <ProductCard
+                  product={item}
+                  quantity={items[item.id]?.quantity || 0}
+                  addIcon={addIcon}
+                  cardWidth={cardWidth}
+                  onIncrease={() => dispatch({ type: "ADD", product: item })}
+                  onDecrease={() => dispatch({ type: "DECREASE", key: item.id })}
+                  onOpenSpecs={() => setActiveProduct(item)}
+                />
+              )}
+            />
+          )}
         </View>
 
         <View
@@ -121,7 +139,10 @@ export default function POSScreen() {
         >
           <Text className="text-lg font-semibold text-darcy mb-4">Summary</Text>
           {list.map((entry) => (
-            <View key={entry.key} className="flex-row justify-between mb-2">
+            <View
+              key={entry.key}
+              className="flex-row justify-between items-start mb-2"
+            >
               <View className="flex-1 pr-2">
                 <Text>
                   {entry.product.name} ({entry.quantity}x)
@@ -132,12 +153,18 @@ export default function POSScreen() {
                   </Text>
                 )}
               </View>
-              <Text>
+              <Text className="mr-2">
                 ₱
                 {(
                   getUnitPrice(entry.product, entry.options) * entry.quantity
                 ).toFixed(2)}
               </Text>
+              <Pressable
+                onPress={() => dispatch({ type: "REMOVE_KEY", key: entry.key })}
+                hitSlop={8}
+              >
+                <Text className="text-warn font-bold">×</Text>
+              </Pressable>
             </View>
           ))}
 
@@ -206,6 +233,13 @@ export default function POSScreen() {
           activeProduct &&
           dispatch({ type: "ADD", product: activeProduct, options })
         }
+      />
+
+      <PaymentModeModal
+        visible={paymentModalOpen}
+        total={total}
+        onClose={() => setPaymentModalOpen(false)}
+        onConfirm={handlePaymentConfirm}
       />
     </View>
   );
