@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Search, Plus, Pencil } from "lucide-react-native";
 import TextField from "../../components/TextField";
 import InventoryProductCard from "../../components/inventory/products/InventoryProductCard";
-import { PRODUCTS, CATEGORIES } from "../../constants/mockData";
+import { CATEGORIES, PRODUCTS } from "../../constants/mockData";
 
 // Adjust to wherever you place the product-form route file.
 const PRODUCT_FORM_ROUTE = "/(inventory)/product-form";
@@ -16,8 +16,11 @@ export default function ProductsScreen() {
 
   const filtered = useMemo(() => {
     return PRODUCTS.filter((p) => {
-      const matchesCategory = category === "All Menu" || p.category === category;
-      return matchesCategory && p.name.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory =
+        category === "All Menu" || p.category === category;
+      return (
+        matchesCategory && p.name.toLowerCase().includes(search.toLowerCase())
+      );
     });
   }, [search, category]);
 
@@ -50,7 +53,9 @@ export default function ProductsScreen() {
 
           <Pressable className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 py-2">
             <Pencil size={18} color="#334155" />
-            <Text className="text-slate-700 font-medium ml-2">Edit categories</Text>
+            <Text className="text-slate-700 font-medium ml-2">
+              Edit categories
+            </Text>
           </Pressable>
         </View>
       </View>
