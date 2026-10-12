@@ -1,11 +1,16 @@
-import { Pencil, Plus, Search } from "lucide-react-native";
-import { useMemo, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { useState, useMemo } from "react";
+import { View, Text, FlatList, Pressable } from "react-native";
+import { useRouter } from "expo-router";
+import { Search, Plus, Pencil } from "lucide-react-native";
 import TextField from "../../components/TextField";
 import InventoryProductCard from "../../components/inventory/products/InventoryProductCard";
 import { CATEGORIES, PRODUCTS } from "../../constants/mockData";
 
+// Adjust to wherever you place the product-form route file.
+const PRODUCT_FORM_ROUTE = "/(inventory)/product-form";
+
 export default function ProductsScreen() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Menu");
 
@@ -18,6 +23,11 @@ export default function ProductsScreen() {
       );
     });
   }, [search, category]);
+
+  const openAddProduct = () => router.push(PRODUCT_FORM_ROUTE as any);
+
+  const openEditProduct = (id: string) =>
+    router.push({ pathname: PRODUCT_FORM_ROUTE as any, params: { id } });
 
   return (
     <View className="flex-1 bg-cream p-6">
@@ -33,10 +43,14 @@ export default function ProductsScreen() {
         </View>
 
         <View className="flex-row">
-          <Pressable className="flex-row items-center bg-darcy rounded-lg px-4 py-2 mr-3">
+          <Pressable
+            onPress={openAddProduct}
+            className="flex-row items-center bg-darcy rounded-lg px-4 py-2 mr-3"
+          >
             <Plus size={18} color="#fff" />
             <Text className="text-white font-medium ml-2">Add product</Text>
           </Pressable>
+
           <Pressable className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 py-2">
             <Pencil size={18} color="#334155" />
             <Text className="text-slate-700 font-medium ml-2">
@@ -68,9 +82,7 @@ export default function ProductsScreen() {
           <InventoryProductCard
             product={item}
             available={item.available ?? true}
-            onPress={() => {
-              // edit modal logic
-            }}
+            onPress={() => openEditProduct(item.id)}
           />
         )}
       />
