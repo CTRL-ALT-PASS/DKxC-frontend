@@ -1,27 +1,47 @@
+import { LogOut, type LucideIcon } from "lucide-react-native";
 import { useState } from "react";
-import { Image, ImageSourcePropType, View } from "react-native";
+import { Image, ImageSourcePropType, Pressable, View } from "react-native";
 
-import IconButton from "./IconButton";
 import LogoutConfirmation from "./LogoutConfirmation";
 
-interface NavItem {
+export interface NavItem {
   key: string;
-  icon: ImageSourcePropType;
+  icon: LucideIcon;
   onPress: () => void;
   isActive?: boolean;
 }
 
 interface SidebarProps {
   navItems: NavItem[];
-  logoutIcon: ImageSourcePropType;
   onLogout: () => void | Promise<void>;
+  logoutIcon?: LucideIcon;
   logo?: ImageSourcePropType;
+}
+
+const ICON_SIZE = 24;
+const ICON_STROKE = 1.8;
+
+function SidebarButton({
+  icon: Icon,
+  onPress,
+}: {
+  icon: LucideIcon;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="w-12 h-12 items-center justify-center rounded-xl"
+    >
+      <Icon size={ICON_SIZE} color="white" strokeWidth={ICON_STROKE} />
+    </Pressable>
+  );
 }
 
 export default function Sidebar({
   navItems,
-  logoutIcon,
   onLogout,
+  logoutIcon = LogOut,
   logo,
 }: SidebarProps) {
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
@@ -45,14 +65,13 @@ export default function Sidebar({
               {item.isActive && (
                 <View className="absolute left-0 top-2 bottom-2 w-1 bg-white rounded-r-full" />
               )}
-
-              <IconButton icon={item.icon} onPress={item.onPress} />
+              <SidebarButton icon={item.icon} onPress={item.onPress} />
             </View>
           ))}
         </View>
 
         {/* Open confirmation instead of logging out immediately */}
-        <IconButton
+        <SidebarButton
           icon={logoutIcon}
           onPress={() => setShowLogoutConfirmation(true)}
         />
