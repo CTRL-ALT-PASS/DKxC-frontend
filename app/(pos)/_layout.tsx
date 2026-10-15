@@ -3,18 +3,22 @@ import darcyMark from "@/assets/icons/darcy-mark.png";
 import gridIcon from "@/assets/icons/grid.png";
 import logoutIcon from "@/assets/icons/logout.png";
 import Sidebar from "@/components/Sidebar";
-import { useAuth } from "../../context/AuthContext";
 import { Slot, usePathname, useRouter } from "expo-router";
 import { View } from "react-native";
+import { useAuth } from "../../context/AuthContext";
 
 export default function TabsLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  const { setUser } = useAuth();
+  const { signOut } = useAuth();
 
-  const handleLogout = () => {
-    setUser(null);
-    router.replace("/login");
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.replace("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   const navItems = [
@@ -37,8 +41,8 @@ export default function TabsLayout() {
       <Sidebar
         navItems={navItems}
         logoutIcon={logoutIcon}
-        logo={darcyMark}
         onLogout={handleLogout}
+        logo={darcyMark}
       />
       <View className="flex-1">
         <Slot />

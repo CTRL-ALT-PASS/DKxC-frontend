@@ -12,13 +12,12 @@ import logoLight from "../assets/images/darcys-logo-light.png";
 import Button from "../components/Button";
 import TextField from "../components/TextField";
 import { useAuth } from "../context/AuthContext";
-import { login } from "../services/authApi";
 
 cssInterop(LinearGradient, { className: "style" });
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { signIn } = useAuth();
   const [employeeId, setEmployeeId] = useState("");
   const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
@@ -26,24 +25,46 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (loading) return; // ignore taps while a login is already in flight
+    if (loading) return;
+
     setError("");
+
+    if (!employeeId.trim() || !pin) {
+      setError("Please enter your employee ID and PIN.");
+      return;
+    }
+
     setLoading(true);
+
     try {
-      const user = await login(employeeId, pin);
-      setUser(user);
-      // Cashiers land in the POS, admins land in the inventory dashboard.
-      router.replace(user.role === "admin" ? "/(inventory)/dashboard" : "/(pos)/menu");
+      const employee = await signIn(employeeId, pin);
+
+      if (employee.role.toLowerCase() === "manager") {
+        router.replace("/(inventory)/dashboard");
+      } else {
+        router.replace("/(pos)/menu");
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Something went wrong. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <LinearGradient colors={["#2F5A3F", "#14291C"]} className="flex-1 items-center justify-center px-6">
-      <Image source={logoLight} style={{ width: 140, height: 140, marginBottom: 32 }} contentFit="contain" />
+    <LinearGradient
+      colors={["#2F5A3F", "#14291C"]}
+      className="flex-1 items-center justify-center px-6"
+    >
+      <Image
+        source={logoLight}
+        style={{ width: 140, height: 140, marginBottom: 32 }}
+        contentFit="contain"
+      />
       <View className="bg-slate-100 rounded-2xl p-6 w-full max-w-sm">
         <Text className="text-center text-lg font-bold mb-4">LOGIN</Text>
 
@@ -70,7 +91,11 @@ export default function LoginScreen() {
         />
 
         {!!error && <Text className="text-warn text-xs mt-2">{error}</Text>}
-        <Button label={loading ? "Logging in..." : "Log In"} onPress={handleLogin} className="mt-6" />
+        <Button
+          label={loading ? "Logging in..." : "Log In"}
+          onPress={handleLogin}
+          className="mt-6"
+        />
       </View>
     </LinearGradient>
   );
