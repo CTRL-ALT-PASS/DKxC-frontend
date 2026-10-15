@@ -10,6 +10,7 @@ import {
 import {
   getCurrentEmployee,
   login as loginRequest,
+  logout as logoutRequest,
   type AuthUser,
 } from "../services/authApi";
 
@@ -88,9 +89,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await clearAuthToken();
-    setUser(null);
-    setSessionError(null);
+    let token: string | null = null;
+
+    try {
+      token = await getAuthToken();
+    } catch (error) {
+      console.error("Failed to retrieve auth token:", error);
+    }
+
+    // Always clear the local session, even if the server is unreachable.
+    try {
+      await clearAuthToken();
+    } finally {
+      setUser(null);
+      setSessionError(null);
+    }
+
+    // Attempt to revoke the token on the backend.
+    // Local logout must not depend on network availability.
+    if (token) {
+      void logoutRequest(token).catch((error) => {
+        console.warn(
+          "Local logout succeeded, but server token revocation could not be confirmed:",
+          error,
+        );
+      });
+    }
   }, []);
 
   const retrySessionRestore = useCallback(async () => {

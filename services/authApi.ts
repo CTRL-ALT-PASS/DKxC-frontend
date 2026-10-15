@@ -87,3 +87,17 @@ export async function getCurrentEmployee(token: string): Promise<AuthUser> {
     role: employee.role,
   };
 }
+
+export async function logout(token: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/logout`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Logout request failed (${response.status}).`);
+  }
+}
