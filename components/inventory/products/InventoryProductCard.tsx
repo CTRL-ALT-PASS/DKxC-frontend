@@ -1,8 +1,8 @@
-import { View, Text, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Eye, EyeOff } from "lucide-react-native";
-import Badge from "../../Badge";
+import { Pressable, Text, View } from "react-native";
 import type { Product } from "../../../constants/mockData";
+import MarqueeBadge from "./MarqueeBadge";
 
 interface InventoryProductCardProps {
   product: Product;
@@ -18,11 +18,16 @@ export default function InventoryProductCard({
   return (
     <Pressable
       onPress={onPress}
-      className="bg-white rounded-2xl p-3 w-40 mr-4 mb-4 border border-slate-200"
+      className="bg-white rounded-2xl p-3 w-40 border border-slate-200"
     >
       <Image
         source={product.image}
-        style={{ width: "100%", height: 124, borderRadius: 12, marginBottom: 8 }}
+        style={{
+          width: "100%",
+          height: 124,
+          borderRadius: 12,
+          marginBottom: 8,
+        }}
         contentFit="cover"
       />
       <Text className="font-semibold text-slate-800">{product.name}</Text>
@@ -42,7 +47,7 @@ export default function InventoryProductCard({
             {available ? "Available" : "Unavailable"}
           </Text>
         </View>
-        <Badge label={product.category} />
+        <MarqueeBadge label={product.category} />
       </View>
     </Pressable>
   );

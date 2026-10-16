@@ -1,8 +1,8 @@
 import type { Product } from "@/constants/mockData";
 import { Image } from "expo-image";
 import { ImageSourcePropType, Pressable, Text, View } from "react-native";
-import Badge from "./Badge";
 import QuantityStepper from "./QuantityStepper";
+import MarqueeBadge from "./inventory/products/MarqueeBadge";
 
 interface ProductCardProps {
   product: Product;
@@ -44,7 +44,7 @@ export default function ProductCard({
         <Text className="font-semibold text-slate-800">{product.name}</Text>
         <Text className="text-slate-500 mb-2">₱{product.price.toFixed(2)}</Text>
         <View className="flex-row items-center justify-between">
-          <Badge label={product.category} />
+          <MarqueeBadge label={product.category} />
           {(hasSpecs || quantity === 0) && (
             <Image
               source={addIcon}
