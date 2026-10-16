@@ -1,8 +1,9 @@
 import type { Product } from "@/constants/mockData";
 import { Image } from "expo-image";
 import { ImageSourcePropType, Pressable, Text, View } from "react-native";
-import Badge from "./Badge";
 import QuantityStepper from "./QuantityStepper";
+import MarqueeBadge from "./inventory/products/MarqueeBadge";
+import { PRODUCT_CARD_WIDTH } from "./shared/ProductGrid"; // adjust path if needed
 
 interface ProductCardProps {
   product: Product;
@@ -11,7 +12,6 @@ interface ProductCardProps {
   onIncrease: () => void;
   onDecrease: () => void;
   onOpenSpecs?: () => void;
-  cardWidth?: number;
 }
 
 export default function ProductCard({
@@ -21,21 +21,20 @@ export default function ProductCard({
   onIncrease,
   onDecrease,
   onOpenSpecs,
-  cardWidth = 100,
 }: ProductCardProps) {
   const hasSpecs = !!product.specs?.length;
 
   return (
     <Pressable onPress={hasSpecs ? onOpenSpecs : onIncrease}>
       <View
-        style={{ width: cardWidth }}
-        className="bg-white rounded-2xl p-3 mr-4 mb-4"
+        style={{ width: PRODUCT_CARD_WIDTH }}
+        className="bg-white rounded-2xl p-3"
       >
         <Image
           source={product.image}
           style={{
             width: "100%",
-            height: Math.round(cardWidth * 0.8),
+            height: 124,
             borderRadius: 12,
             marginBottom: 8,
           }}
@@ -44,7 +43,7 @@ export default function ProductCard({
         <Text className="font-semibold text-slate-800">{product.name}</Text>
         <Text className="text-slate-500 mb-2">₱{product.price.toFixed(2)}</Text>
         <View className="flex-row items-center justify-between">
-          <Badge label={product.category} />
+          <MarqueeBadge label={product.category} />
           {(hasSpecs || quantity === 0) && (
             <Image
               source={addIcon}

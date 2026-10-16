@@ -10,11 +10,26 @@ interface StockNotificationProps {
 
 const STATUS_CONFIG: Record<
   StockStatus,
-  { color: string; icon: LucideIcon }
+  { color: string; tint: string; icon: LucideIcon; label: string }
 > = {
-  sufficient: { color: "#2E7D46", icon: CheckCircle2 },
-  low: { color: "#B8860B", icon: AlertCircle },
-  critical: { color: "#C0392B", icon: XCircle },
+  sufficient: {
+    color: "#2E7D46",
+    tint: "#E8F3EB",
+    icon: CheckCircle2,
+    label: "All good",
+  },
+  low: {
+    color: "#B8860B",
+    tint: "#FBF1DD",
+    icon: AlertCircle,
+    label: "Running low",
+  },
+  critical: {
+    color: "#C0392B",
+    tint: "#FBE9E7",
+    icon: XCircle,
+    label: "Needs attention",
+  },
 };
 
 export default function StockNotification({
@@ -25,17 +40,25 @@ export default function StockNotification({
   const Icon = config.icon;
 
   return (
-    <View
-      style={{ borderColor: config.color }}
-      className="flex-row items-center gap-3 rounded-2xl border bg-[#F7F4ED] p-5"
-    >
-      <Icon size={22} color={config.color} />
-      <Text
-        style={{ color: config.color }}
-        className="flex-1 text-center text-base font-medium"
+    <View className="flex-row items-center gap-4 rounded-3xl bg-white p-5 shadow-sm">
+      <View
+        style={{ backgroundColor: config.tint }}
+        className="h-11 w-11 items-center justify-center rounded-full"
       >
-        {message}
-      </Text>
+        <Icon size={20} color={config.color} />
+      </View>
+
+      <View className="flex-1">
+        <Text
+          style={{ color: config.color }}
+          className="text-xs font-semibold"
+        >
+          {config.label}
+        </Text>
+        <Text className="mt-0.5 text-sm leading-5 text-[#141813]">
+          {message}
+        </Text>
+      </View>
     </View>
   );
 }

@@ -1,32 +1,34 @@
-import bagIcon from "@/assets/icons/bag.png";
 import darcyMark from "@/assets/icons/darcy-mark.png";
-import gridIcon from "@/assets/icons/grid.png";
-import logoutIcon from "@/assets/icons/logout.png";
 import Sidebar from "@/components/Sidebar";
-import { useAuth } from "../../context/AuthContext";
 import { Slot, usePathname, useRouter } from "expo-router";
+import { LayoutGrid, ShoppingBag } from "lucide-react-native";
 import { View } from "react-native";
+import { useAuth } from "../../context/AuthContext";
 
 export default function TabsLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  const { setUser } = useAuth();
+  const { signOut } = useAuth();
 
-  const handleLogout = () => {
-    setUser(null);
-    router.replace("/login");
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.replace("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   const navItems = [
     {
       key: "order",
-      icon: gridIcon,
+      icon: LayoutGrid,
       isActive: pathname === "/menu",
       onPress: () => router.navigate("/menu"),
     },
     {
       key: "checkout",
-      icon: bagIcon,
+      icon: ShoppingBag,
       isActive: pathname === "/checkout",
       onPress: () => router.navigate("/checkout"),
     },
@@ -34,12 +36,7 @@ export default function TabsLayout() {
 
   return (
     <View className="flex-1 flex-row">
-      <Sidebar
-        navItems={navItems}
-        logoutIcon={logoutIcon}
-        logo={darcyMark}
-        onLogout={handleLogout}
-      />
+      <Sidebar navItems={navItems} onLogout={handleLogout} logo={darcyMark} />
       <View className="flex-1">
         <Slot />
       </View>

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ReactN",
-    "slug": "ReactN",
+    "name": "Darcy's Kitchen x Cafe",
+    "slug": "Darcy's Kitchen x Cafe",
     "version": "1.0.0",
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
@@ -41,7 +41,9 @@
         }
       ],
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-community/datetimepicker",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": false,
