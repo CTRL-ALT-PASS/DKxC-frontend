@@ -1,11 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  FlatList,
-  Pressable,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import addIcon from "../../assets/icons/basket-add.png";
 import chevronIcon from "../../assets/icons/chevron-down.png";
 import searchIcon from "../../assets/icons/search.png";
@@ -14,16 +8,12 @@ import Header from "../../components/Header";
 import PaymentModeModal from "../../components/PaymentModeModal";
 import ProductCard from "../../components/ProductCard";
 import ProductOptionsModal from "../../components/ProductOptionsModal";
+import ProductGrid from "../../components/shared/ProductGrid";
 import TextField from "../../components/TextField";
 import { getUnitPrice, type Product } from "../../constants/mockData";
 import { useAuth } from "../../context/AuthContext";
 import { useCart, type PaymentMode } from "../../context/CartContext";
 import { useProducts } from "../../hooks/use-products";
-
-const SIDEBAR_WIDTH = 64;
-const GRID_PADDING = 24;
-const CARD_GAP = 16;
-const MAX_CARD_WIDTH = 160;
 
 export default function POSScreen() {
   const { width } = useWindowDimensions();
@@ -41,14 +31,7 @@ export default function POSScreen() {
   const { items, list, total, orderType, dispatch, completeTransaction } =
     useCart();
   const isCartEmpty = list.length === 0;
-
-  const numColumns = width < 700 ? 2 : width < 1000 ? 3 : 4;
   const summaryWidth = Math.min(320, Math.max(220, Math.round(width * 0.22)));
-  const gridAreaWidth = width - SIDEBAR_WIDTH - summaryWidth - GRID_PADDING * 2;
-  const cardWidth = Math.min(
-    MAX_CARD_WIDTH,
-    Math.floor((gridAreaWidth - CARD_GAP * (numColumns - 1)) / numColumns),
-  );
 
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -86,8 +69,8 @@ export default function POSScreen() {
       <Header
         title="Darcy's Kitchen & Cafe POS"
         date={today}
-        user={user}
-        chevronIcon={chevronIcon}
+        // user={user}
+        // chevronIcon={chevronIcon}
       />
 
       <View className="flex-1 flex-row">
@@ -113,26 +96,25 @@ export default function POSScreen() {
           ) : menuError ? (
             <Text className="text-warn mt-6">{menuError}</Text>
           ) : (
-            <FlatList
-              key={`cols-${numColumns}`}
+            <ProductGrid
               data={filtered}
-              numColumns={numColumns}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
+              extraData={items}
+              renderCard={(item) => (
                 <ProductCard
                   product={item}
                   quantity={items[item.id]?.quantity || 0}
                   addIcon={addIcon}
-                  cardWidth={cardWidth}
                   onIncrease={() => dispatch({ type: "ADD", product: item })}
-                  onDecrease={() => dispatch({ type: "DECREASE", key: item.id })}
+                  onDecrease={() =>
+                    dispatch({ type: "DECREASE", key: item.id })
+                  }
                   onOpenSpecs={() => setActiveProduct(item)}
                 />
               )}
             />
           )}
         </View>
-
         <View
           style={{ width: summaryWidth }}
           className="bg-white p-6 border-l border-slate-200"
