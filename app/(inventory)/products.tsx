@@ -1,12 +1,11 @@
-import { useState, useMemo } from "react";
-import { View, Text, FlatList, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { Search, Plus, Pencil } from "lucide-react-native";
+import { Pencil, Plus, Search } from "lucide-react-native";
+import { useMemo, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import TextField from "../../components/TextField";
 import InventoryProductCard from "../../components/inventory/products/InventoryProductCard";
 import { CATEGORIES, PRODUCTS } from "../../constants/mockData";
 
-// Adjust to wherever you place the product-form route file.
 const PRODUCT_FORM_ROUTE = "/(inventory)/product-form";
 
 export default function ProductsScreen() {
@@ -18,6 +17,7 @@ export default function ProductsScreen() {
     return PRODUCTS.filter((p) => {
       const matchesCategory =
         category === "All Menu" || p.category === category;
+
       return (
         matchesCategory && p.name.toLowerCase().includes(search.toLowerCase())
       );
@@ -27,18 +27,22 @@ export default function ProductsScreen() {
   const openAddProduct = () => router.push(PRODUCT_FORM_ROUTE as any);
 
   const openEditProduct = (id: string) =>
-    router.push({ pathname: PRODUCT_FORM_ROUTE as any, params: { id } });
+    router.push({
+      pathname: PRODUCT_FORM_ROUTE as any,
+      params: { id },
+    });
 
   return (
     <View className="flex-1 bg-cream p-6">
+      {/* Search and actions */}
       <View className="flex-row items-center justify-between mb-4">
-        <View className="flex-row items-center flex-1 mr-4">
+        <View className="flex-1 mr-4">
           <TextField
             icon={<Search size={18} color="#94a3b8" />}
             placeholder="Search for a product"
             value={search}
             onChangeText={setSearch}
-            className="flex-1 mr-3"
+            className="flex-1"
           />
         </View>
 
@@ -60,32 +64,37 @@ export default function ProductsScreen() {
         </View>
       </View>
 
+      {/* Categories */}
       <View className="flex-row flex-wrap mb-4">
         {CATEGORIES.map((c) => (
-          <Text
+          <Pressable
             key={c}
             onPress={() => setCategory(c)}
-            className={`mr-3 mb-2 px-3 py-1 rounded-full overflow-hidden ${
-              c === category ? "bg-darcy text-white" : "bg-white text-slate-600"
+            className={`mr-3 mb-2 px-3 py-1 rounded-full ${
+              c === category ? "bg-darcy" : "bg-white"
             }`}
           >
-            {c}
-          </Text>
+            <Text className={c === category ? "text-white" : "text-slate-600"}>
+              {c}
+            </Text>
+          </Pressable>
         ))}
       </View>
 
-      <FlatList
-        data={filtered}
-        numColumns={4}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <InventoryProductCard
-            product={item}
-            available={item.available ?? true}
-            onPress={() => openEditProduct(item.id)}
-          />
-        )}
-      />
+      {/* Product grid */}
+      <View className="flex-1">
+        <View className="flex-row flex-wrap">
+          {filtered.map((item) => (
+            <View key={item.id} className="mb-3 mr-3">
+              <InventoryProductCard
+                product={item}
+                available={item.available ?? true}
+                onPress={() => openEditProduct(item.id)}
+              />
+            </View>
+          ))}
+        </View>
+      </View>
     </View>
   );
 }

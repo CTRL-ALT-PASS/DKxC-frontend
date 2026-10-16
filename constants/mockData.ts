@@ -35,7 +35,8 @@ export interface InventoryItem {
   category: string;
   stocks: number;
   variance: number;
-  unitCost: number;
+  unit: string;
+  baseCost: number;
 }
 
 export const CURRENT_USER: User = {
@@ -207,7 +208,8 @@ export const INVENTORY: InventoryItem[] = [
     category: "Coffee",
     stocks: 2,
     variance: 2,
-    unitCost: 300,
+    unit: "g",
+    baseCost: 300,
   },
   {
     id: "i2",
@@ -216,7 +218,8 @@ export const INVENTORY: InventoryItem[] = [
     category: "Coffee",
     stocks: 20,
     variance: 0,
-    unitCost: 125,
+    unit: "mL",
+    baseCost: 125,
   },
   {
     id: "i3",
@@ -225,7 +228,8 @@ export const INVENTORY: InventoryItem[] = [
     category: "Coffee",
     stocks: 15,
     variance: 1,
-    unitCost: 300,
+    unit: "mL",
+    baseCost: 300,
   },
   {
     id: "i5",
@@ -234,7 +238,8 @@ export const INVENTORY: InventoryItem[] = [
     category: "Tea",
     stocks: 5,
     variance: -1,
-    unitCost: 350,
+    unit: "mL",
+    baseCost: 350,
   },
   {
     id: "i6",
@@ -243,7 +248,8 @@ export const INVENTORY: InventoryItem[] = [
     category: "Tea",
     stocks: 10,
     variance: 0,
-    unitCost: 200,
+    unit: "mL",
+    baseCost: 200,
   },
   {
     id: "i7",
@@ -252,6 +258,7 @@ export const INVENTORY: InventoryItem[] = [
     category: "Tea",
     stocks: 8,
     variance: 0,
-    unitCost: 150,
+    unit: "mL",
+    baseCost: 150,
   },
 ];

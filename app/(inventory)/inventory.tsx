@@ -1,59 +1,121 @@
-import { useState, useMemo } from "react";
-import { View, Text, ScrollView, Image } from "react-native";
-import TextField from "../../components/TextField";
-import Button from "../../components/Button";
-import { INVENTORY, LOW_STOCK_THRESHOLD } from "../../constants/mockData";
 import searchIcon from "@/assets/icons/search.png";
-import warningIcon from "@/assets/icons/warning.png";
-import menuIcon from "@/assets/icons/menu.png";
-
-const COLUMNS = ["Last Stock Update", "Item Name", "Category", "Stocks", "Variance", "Unit Cost", ""];
+import { useMemo, useState } from "react";
+import { FlatList, Text, View } from "react-native";
+import Button from "../../components/Button";
+import InventoryRow, {
+  COLUMN_WIDTHS,
+  InventoryItem,
+} from "../../components/inventory/inventory/InventoryRow";
+import StockAdjustSheet from "../../components/inventory/inventory/StockAdjustSheet";
+import TextField from "../../components/TextField";
+import { INVENTORY, LOW_STOCK_THRESHOLD } from "../../constants/mockData";
 
 export default function InventoryScreen() {
   const [search, setSearch] = useState("");
+  const [items, setItems] = useState<InventoryItem[]>(
+    INVENTORY as InventoryItem[],
+  );
+  const [adjusting, setAdjusting] = useState<InventoryItem | null>(null);
+
   const filtered = useMemo(
-    () => INVENTORY.filter((i) => i.itemName.toLowerCase().includes(search.toLowerCase())),
-    [search]
+    () =>
+      items.filter((i) =>
+        i.itemName.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [items, search],
   );
 
+  // Local-only for now; swap for your API/store call later.
+  const handleAdjust = (target: InventoryItem, deltaBase: number) => {
+    const stamp = new Date().toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === target.id
+          ? { ...i, stocks: i.stocks + deltaBase, lastStockUpdate: stamp }
+          : i,
+      ),
+    );
+  };
+
   return (
-    <View className="flex-1 bg-white p-6">
-      <View className="flex-row items-center justify-between mb-4">
-        <Text className="text-2xl font-semibold text-slate-800">Inventory</Text>
+    <View className="flex-1 bg-[#F4F6F4]">
+      {/* Top bar */}
+      <View className="h-20 px-8 flex-row items-center justify-between bg-white border-b border-[#DDE3E0]">
+        <Text className="text-[26px] font-bold text-[#1B2421]">Inventory</Text>
         <Button label="Inventory Logs" variant="outline" />
       </View>
 
-      <View className="flex-row mb-4">
-        <TextField icon={searchIcon} placeholder="Search Item" value={search} onChangeText={setSearch} className="flex-1 mr-3" />
-        <Button label="Search" variant="outline" />
-      </View>
+      <View className="flex-1 p-8">
+        <View className="flex-row mb-4">
+          <TextField
+            icon={searchIcon}
+            placeholder="Search Item"
+            value={search}
+            onChangeText={setSearch}
+            className="flex-1 mr-3"
+          />
+          <Button label="Search" variant="outline" />
+        </View>
 
-      <View className="flex-row bg-darcy rounded-t-xl py-3 px-2">
-        {COLUMNS.map((c) => (
-          <Text key={c} className="flex-1 text-white text-xs font-semibold px-2">
-            {c}
+        {/* Column labels (plain text, no filled header bar) */}
+        <View className="flex-row px-5 mb-3">
+          <Text className="flex-1 text-[13px] font-semibold text-[#5B6762]">
+            Item Name
           </Text>
-        ))}
+          <Text
+            className={`${COLUMN_WIDTHS.lastUpdate} text-[13px] font-semibold text-[#5B6762]`}
+          >
+            Last Stock Update
+          </Text>
+          <Text
+            className={`${COLUMN_WIDTHS.stocks} text-[13px] font-semibold text-[#5B6762]`}
+          >
+            In Stock
+          </Text>
+          <Text
+            className={`${COLUMN_WIDTHS.status} text-[13px] font-semibold text-[#5B6762]`}
+          >
+            Status
+          </Text>
+          <Text
+            className={`${COLUMN_WIDTHS.baseCost} text-[13px] font-semibold text-[#5B6762]`}
+          >
+            Base Cost
+          </Text>
+          <View className={COLUMN_WIDTHS.adjust} />
+          <View className={COLUMN_WIDTHS.menu} />
+        </View>
+
+        <FlatList
+          data={filtered}
+          keyExtractor={(i) => i.id}
+          ItemSeparatorComponent={() => <View className="h-3" />}
+          renderItem={({ item }) => (
+            <InventoryRow
+              item={item}
+              lowStockThreshold={LOW_STOCK_THRESHOLD}
+              onPressAdjust={setAdjusting}
+            />
+          )}
+          ListEmptyComponent={
+            <Text className="text-center text-[#5B6762] mt-8">
+              No items found
+            </Text>
+          }
+        />
       </View>
 
-      <ScrollView>
-        {filtered.map((item) => (
-          <View key={item.id} className="flex-row items-center border-2 border-slate-200 py-3 px-2">
-            <Text className="flex-1 px-2 text-slate-600">{item.lastStockUpdate}</Text>
-            <Text className="flex-1 px-2 text-slate-800">{item.itemName}</Text>
-            <Text className="flex-1 px-2 text-slate-600">{item.category}</Text>
-            <View className="flex-1 flex-row items-center px-2">
-              <Text className="mr-2">{item.stocks}</Text>
-              {item.stocks < LOW_STOCK_THRESHOLD && (
-                <Image source={warningIcon} style={{ width: 16, height: 16 }} resizeMode="contain" />
-              )}
-            </View>
-            <Text className="flex-1 px-2">{item.variance}</Text>
-            <Text className="flex-1 px-2">{item.unitCost}</Text>
-            <Image source={menuIcon} style={{ width: 18, height: 18 }} resizeMode="contain" />
-          </View>
-        ))}
-      </ScrollView>
+      <StockAdjustSheet
+        item={adjusting}
+        onClose={() => setAdjusting(null)}
+        onConfirm={handleAdjust}
+      />
     </View>
   );
 }
