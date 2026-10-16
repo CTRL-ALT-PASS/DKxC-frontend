@@ -1,7 +1,8 @@
+import ProductGrid from "@/components/shared/ProductGrid";
 import { useRouter } from "expo-router";
 import { Pencil, Plus, Search } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import TextField from "../../components/TextField";
 import InventoryProductCard from "../../components/inventory/products/InventoryProductCard";
 import { CATEGORIES, PRODUCTS } from "../../constants/mockData";
@@ -9,8 +10,6 @@ import { CATEGORIES, PRODUCTS } from "../../constants/mockData";
 const PRODUCT_FORM_ROUTE = "/(inventory)/product-form";
 
 const SCREEN_PADDING = 24; // p-6
-const CARD_WIDTH = 160; // w-40
-const GAP = 12; // spacing between cards
 
 export default function ProductsScreen() {
   const router = useRouter();
@@ -28,12 +27,6 @@ export default function ProductsScreen() {
       );
     });
   }, [search, category]);
-
-  // n cards + (n - 1) gaps must fit: n * CARD_WIDTH + (n - 1) * GAP <= available
-  const numColumns = useMemo(() => {
-    if (containerWidth <= 0) return 1;
-    return Math.max(1, Math.floor((containerWidth + GAP) / (CARD_WIDTH + GAP)));
-  }, [containerWidth]);
 
   const openAddProduct = () => router.push(PRODUCT_FORM_ROUTE as any);
 
@@ -93,40 +86,22 @@ export default function ProductsScreen() {
       </View>
 
       {/* Product grid */}
-      <View
-        className="flex-1"
-        onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
-      >
-        {containerWidth > 0 && (
-          <FlatList
-            key={numColumns} // forces re-mount when column count changes
-            data={filtered}
-            numColumns={numColumns}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => (
-              <View
-                style={{
-                  marginRight: (index + 1) % numColumns === 0 ? 0 : GAP,
-                  marginBottom: GAP,
-                }}
-              >
-                <InventoryProductCard
-                  product={item}
-                  available={item.available ?? true}
-                  onPress={() => openEditProduct(item.id)}
-                />
-              </View>
-            )}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            ListEmptyComponent={
-              <Text className="text-slate-500 mt-8 text-center">
-                No products found
-              </Text>
-            }
+      <ProductGrid
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        renderCard={(item) => (
+          <InventoryProductCard
+            product={item}
+            available={item.available ?? true}
+            onPress={() => openEditProduct(item.id)}
           />
         )}
-      </View>
+        ListEmptyComponent={
+          <Text className="text-slate-500 mt-8 text-center">
+            No products found
+          </Text>
+        }
+      />
     </View>
   );
 }

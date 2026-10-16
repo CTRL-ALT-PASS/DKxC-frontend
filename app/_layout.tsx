@@ -27,7 +27,7 @@ function RootNavigator() {
         </Text>
 
         <Text className="mb-6 text-center text-slate-500">
-          Check your connection and make sure the backend is running.
+          Check your connection and confirm that the server is running.
         </Text>
 
         <Pressable
