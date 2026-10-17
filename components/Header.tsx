@@ -18,21 +18,11 @@ export default function Header({ title, date }: HeaderProps) {
       <Text className="text-xl font-semibold text-slate-800">{title}</Text>
 
       <View className="flex-row items-center">
-        <Text className="text-slate-600 mr-4">{date}</Text>
-        <View className="w-px h-5 bg-slate-300 mr-4" />
-
-        <View
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            marginRight: 8,
-            backgroundColor: "#E2E8F0",
-          }}
-        />
+        <Text className="text-slate-800 mr-4">{date}</Text>
+        <View className="w-px h-5 bg-slate-800 mr-4" />
 
         <Text className="text-slate-800 mr-1" numberOfLines={1}>
-          {user.employee_id}
+          {user.fullname}
         </Text>
       </View>
     </View>

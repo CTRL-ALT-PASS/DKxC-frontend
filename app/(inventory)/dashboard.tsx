@@ -1,5 +1,3 @@
-import { useMemo, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
 import BestSelling from "@/components/inventory/dashboard/BestSelling";
 import ChartModal from "@/components/inventory/dashboard/ChartModal";
 import DateRangeSelector from "@/components/inventory/dashboard/DateRangeSelector";
@@ -11,6 +9,8 @@ import {
   type DateRange,
   type Metric,
 } from "@/components/inventory/dashboard/chartData";
+import { useMemo, useState } from "react";
+import { ScrollView, View } from "react-native";
 
 export default function Dashboard() {
   const [range, setRange] = useState<DateRange>(() => quickRange("30d"));
@@ -21,17 +21,17 @@ export default function Dashboard() {
   // sum works whether the range is daily or bucketed.
   const grossSales = useMemo(
     () => buildSeries("sales", range).reduce((sum, p) => sum + p.value, 0),
-    [range]
+    [range],
   );
   const grossProfit = useMemo(
     () => buildSeries("profit", range).reduce((sum, p) => sum + p.value, 0),
-    [range]
+    [range],
   );
 
   return (
     <ScrollView className="flex-1 bg-[#FAF8F3]" contentContainerClassName="p-6">
       {/* Placeholder for the header component you'll add later */}
-      <Text className="mb-6 text-3xl font-bold text-[#141813]">Dashboard</Text>
+      {/* <Text className="mb-6 text-3xl font-bold text-[#141813]">Dashboard</Text> */}
 
       <View className="flex-row gap-4">
         {/* Left column: date range, stat cards, reserved space */}

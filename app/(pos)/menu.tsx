@@ -1,15 +1,15 @@
+import SearchBar from "@/components/shared/SearchBar";
+import { useSearch } from "@/hooks/use-search";
 import { useMemo, useState } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import addIcon from "../../assets/icons/basket-add.png";
 import chevronIcon from "../../assets/icons/chevron-down.png";
-import searchIcon from "../../assets/icons/search.png";
 import CategoryDropdown from "../../components/CategoryDropdown";
 import Header from "../../components/Header";
 import PaymentModeModal from "../../components/PaymentModeModal";
 import ProductCard from "../../components/ProductCard";
 import ProductOptionsModal from "../../components/ProductOptionsModal";
 import ProductGrid from "../../components/shared/ProductGrid";
-import TextField from "../../components/TextField";
 import { getUnitPrice, type Product } from "../../constants/mockData";
 import { useAuth } from "../../context/AuthContext";
 import { useCart, type PaymentMode } from "../../context/CartContext";
@@ -24,8 +24,7 @@ export default function POSScreen() {
     loading: loadingMenu,
     error: menuError,
   } = useProducts();
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All Menu");
+  const [category, setCategory] = useState("All");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const { items, list, total, orderType, dispatch, completeTransaction } =
@@ -39,15 +38,16 @@ export default function POSScreen() {
     day: "numeric",
   });
 
-  const filtered = useMemo(() => {
-    return products.filter((p) => {
-      const matchesCategory =
-        category === "All Menu" || p.category === category;
-      return (
-        matchesCategory && p.name.toLowerCase().includes(search.toLowerCase())
-      );
-    });
-  }, [products, search, category]);
+  const categoryFiltered = useMemo(
+    () => products.filter((p) => category === "All" || p.category === category),
+    [category, products],
+  );
+
+  const {
+    query,
+    setQuery,
+    results: filtered,
+  } = useSearch(categoryFiltered, (p) => p.name);
 
   const chooseOrderType = (type: "Dine In" | "Take out") => {
     dispatch({ type: "SET_ORDER_TYPE", orderType: type });
@@ -65,23 +65,17 @@ export default function POSScreen() {
   if (!user) return null;
 
   return (
-    <View className="flex-1 bg-cream">
-      <Header
-        title="Darcy's Kitchen & Cafe POS"
-        date={today}
-        // user={user}
-        // chevronIcon={chevronIcon}
-      />
+    <View className="flex-1 bg-[#F4F6F4]">
+      <Header title="Darcy's Kitchen & Cafe POS" date={today} />
 
       <View className="flex-1 flex-row">
         <View className="flex-1 p-6">
           <View className="flex-row mb-4">
-            <TextField
-              icon={searchIcon}
+            <SearchBar
+              value={query}
+              onChangeText={setQuery}
               placeholder="Search for a product"
-              value={search}
-              onChangeText={setSearch}
-              className="flex-1 mr-3"
+              className="w-80 mr-4"
             />
             <CategoryDropdown
               categories={categories}

@@ -1,4 +1,4 @@
-import { API_BASE_URL, API_PREFIX } from "./apiConfig";
+import { API_BASE_URL, API_PREFIX } from "../config/api/apiConfig";
 
 export type AuthUser = {
   employee_id: string;
