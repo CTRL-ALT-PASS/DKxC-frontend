@@ -16,7 +16,7 @@ const categoryOptions: Option[] = CATEGORIES.filter((c) => c !== "All").map(
 
 const ingredientOptions: Option[] = INVENTORY.map((i) => ({
   id: String(i.id),
-  label: i.name,
+  label: i.itemName,
 }));
 
 export default function ProductFormRoute() {
