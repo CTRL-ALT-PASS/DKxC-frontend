@@ -1,9 +1,10 @@
 import ProductGrid from "@/components/shared/ProductGrid";
+import SearchBar from "@/components/shared/SearchBar";
+import { useSearch } from "@/hooks/use-search";
 import { useRouter } from "expo-router";
-import { Pencil, Plus, Search } from "lucide-react-native";
+import { Pencil, Plus } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import TextField from "../../components/TextField";
 import InventoryProductCard from "../../components/inventory/products/InventoryProductCard";
 import { CATEGORIES, PRODUCTS } from "../../constants/mockData";
 
@@ -14,19 +15,18 @@ const SCREEN_PADDING = 24; // p-6
 export default function ProductsScreen() {
   const router = useRouter();
   const [containerWidth, setContainerWidth] = useState(0);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All Menu");
+  const [category, setCategory] = useState("All");
 
-  const filtered = useMemo(() => {
-    return PRODUCTS.filter((p) => {
-      const matchesCategory =
-        category === "All Menu" || p.category === category;
+  const categoryFiltered = useMemo(
+    () => PRODUCTS.filter((p) => category === "All" || p.category === category),
+    [category],
+  );
 
-      return (
-        matchesCategory && p.name.toLowerCase().includes(search.toLowerCase())
-      );
-    });
-  }, [search, category]);
+  const {
+    query,
+    setQuery,
+    results: filtered,
+  } = useSearch(categoryFiltered, (p) => p.name);
 
   const openAddProduct = () => router.push(PRODUCT_FORM_ROUTE as any);
 
@@ -37,18 +37,15 @@ export default function ProductsScreen() {
     });
 
   return (
-    <View className="flex-1 bg-cream p-6">
+    <View className="flex-1 bg-[#F4F6F4] p-6">
       {/* Search and actions */}
       <View className="flex-row items-center justify-between mb-4">
-        <View className="w-80 mr-4">
-          <TextField
-            icon={<Search size={18} color="#94a3b8" />}
-            placeholder="Search for a product"
-            value={search}
-            onChangeText={setSearch}
-            className="h-12 bg-white rounded-lg px-3"
-          />
-        </View>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search for a product"
+          className="w-80 mr-4"
+        />
 
         <View className="flex-row">
           <Pressable

@@ -1,16 +1,18 @@
-import { useMemo } from "react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useMemo } from "react";
 import ProductFormScreen, {
   Option,
   ProductFormValues,
 } from "../../components/inventory/products/ProductFormScreen";
-import { PRODUCTS, CATEGORIES, INVENTORY } from "../../constants/mockData";
+import { CATEGORIES, INVENTORY, PRODUCTS } from "../../constants/mockData";
 
 // Adjust the field names below if your mock data differs (assumes INVENTORY items have `id` and `name`).
-const categoryOptions: Option[] = CATEGORIES.filter((c) => c !== "All Menu").map((c) => ({
-  id: c,
-  label: c,
-}));
+const categoryOptions: Option[] = CATEGORIES.filter((c) => c !== "All").map(
+  (c) => ({
+    id: c,
+    label: c,
+  }),
+);
 
 const ingredientOptions: Option[] = INVENTORY.map((i) => ({
   id: String(i.id),
