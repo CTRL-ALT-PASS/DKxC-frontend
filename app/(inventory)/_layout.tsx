@@ -22,7 +22,7 @@ const NAV = [
     alsoMatches: ["product-form"], // add/edit screen belongs to Products
   },
   { key: "inventory", icon: Package, title: "Inventory" },
-  { key: "users", icon: Users, title: "Users" },
+  { key: "employees", icon: Users, title: "Employees" },
 ];
 
 const matchesSection = (item: (typeof NAV)[number], pathname: string) =>
