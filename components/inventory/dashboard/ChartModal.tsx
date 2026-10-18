@@ -1,13 +1,8 @@
-import { useMemo } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { X } from "lucide-react-native";
-import {
-  buildSeries,
-  niceMax,
-  type DateRange,
-  type Metric,
-} from "./chartData";
+import { useMemo } from "react";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { buildSeries, niceMax, type DateRange, type Metric } from "./chartData";
 
 interface ChartModalProps {
   metric: Metric | null;
@@ -18,6 +13,7 @@ interface ChartModalProps {
 const CHART_HEIGHT = 220;
 const GRIDLINE_COUNT = 5;
 const BAR_SLOT_WIDTH = 46;
+const MAX_SLOTS_WITHOUT_SCROLL = 10;
 
 const METRIC_LABEL: Record<Metric, string> = {
   sales: "Gross Sales",
@@ -41,17 +37,21 @@ function formatRange(range: DateRange) {
   return `${fmt(range.start)} – ${fmt(range.end)}`;
 }
 
-export default function ChartModal({ metric, range, onClose }: ChartModalProps) {
+export default function ChartModal({
+  metric,
+  range,
+  onClose,
+}: ChartModalProps) {
   const visible = metric !== null;
 
   const data = useMemo(
     () => (metric ? buildSeries(metric, range) : []),
-    [metric, range]
+    [metric, range],
   );
 
   const total = useMemo(
     () => data.reduce((sum, p) => sum + p.value, 0),
-    [data]
+    [data],
   );
 
   const maxValue = useMemo(() => {
@@ -62,18 +62,27 @@ export default function ChartModal({ metric, range, onClose }: ChartModalProps) 
   const gridlines = useMemo(() => {
     const step = maxValue / GRIDLINE_COUNT;
     return Array.from({ length: GRIDLINE_COUNT }, (_, i) =>
-      Math.round(step * (GRIDLINE_COUNT - i))
+      Math.round(step * (GRIDLINE_COUNT - i)),
     );
   }, [maxValue]);
 
-  const needsScroll = data.length > 10;
+  const needsScroll = data.length > MAX_SLOTS_WITHOUT_SCROLL;
 
   if (!metric) return null;
 
   const gradient = METRIC_GRADIENT[metric];
 
+  // Short ranges: slots share the available width evenly (bars spread across
+  // the whole chart). Long ranges: fixed-width slots inside a horizontal scroll.
+  const slotStyle = needsScroll ? { width: BAR_SLOT_WIDTH } : { flex: 1 };
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <Pressable
         className="flex-1 items-center justify-center bg-black/45 px-6"
         onPress={onClose}
@@ -129,8 +138,16 @@ export default function ChartModal({ metric, range, onClose }: ChartModalProps) 
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 scrollEnabled={needsScroll}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ flexGrow: 1 }}
               >
-                <View style={{ minWidth: data.length * BAR_SLOT_WIDTH }}>
+                <View
+                  style={
+                    needsScroll
+                      ? { minWidth: data.length * BAR_SLOT_WIDTH }
+                      : { flex: 1 }
+                  }
+                >
                   <View style={{ height: CHART_HEIGHT }} className="relative">
                     <View className="absolute inset-0 justify-between">
                       {gridlines.map((g) => (
@@ -142,17 +159,17 @@ export default function ChartModal({ metric, range, onClose }: ChartModalProps) 
                       {data.map((point, i) => (
                         <View
                           key={`${point.label}-${i}`}
-                          style={{ width: BAR_SLOT_WIDTH }}
+                          style={slotStyle}
                           className="items-center justify-end px-1"
                         >
                           <View
                             style={{
                               height: Math.max(
                                 3,
-                                (point.value / maxValue) * CHART_HEIGHT
+                                (point.value / maxValue) * CHART_HEIGHT,
                               ),
                             }}
-                            className="w-full max-w-[28px] overflow-hidden rounded-t-md"
+                            className="w-full max-w-[36px] overflow-hidden rounded-t-md"
                           >
                             <LinearGradient
                               colors={gradient}
@@ -170,7 +187,7 @@ export default function ChartModal({ metric, range, onClose }: ChartModalProps) 
                     {data.map((point, i) => (
                       <Text
                         key={`${point.label}-${i}`}
-                        style={{ width: BAR_SLOT_WIDTH }}
+                        style={slotStyle}
                         className="text-center text-xs text-black/50"
                       >
                         {point.label}
