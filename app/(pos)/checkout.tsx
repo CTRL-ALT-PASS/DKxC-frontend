@@ -1,7 +1,10 @@
 import { ScrollView, Text, View } from "react-native";
-import chevronIcon from "../../assets/icons/chevron-down.png";
 import Header from "../../components/Header";
-import { getUnitPrice } from "../../constants/mockData";
+import {
+  formatOptions,
+  formatPromo,
+  getLineTotal,
+} from "../../constants/pricing";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 
@@ -22,8 +25,8 @@ export default function TransactionHistoryScreen() {
       <Header
         title="Transaction History"
         date={today}
-        user={user}
-        chevronIcon={chevronIcon}
+        // user={user}
+        // chevronIcon={chevronIcon}
       />
 
       <ScrollView className="flex-1 p-6">
@@ -64,14 +67,26 @@ export default function TransactionHistoryScreen() {
                   </Text>
                   {entry.options && (
                     <Text className="text-xs text-slate-500">
-                      {Object.values(entry.options).join(", ")}
+                      {formatOptions(entry.options)}
+                    </Text>
+                  )}
+                  {!!entry.discountPercent && (
+                    <Text className="text-xs text-darcy font-medium">
+                      {formatPromo(
+                        entry.product,
+                        entry.options,
+                        entry.discountPercent,
+                      )}
                     </Text>
                   )}
                 </View>
                 <Text className="text-sm">
                   ₱
-                  {(
-                    getUnitPrice(entry.product, entry.options) * entry.quantity
+                  {getLineTotal(
+                    entry.product,
+                    entry.options,
+                    entry.quantity,
+                    entry.discountPercent,
                   ).toFixed(2)}
                 </Text>
               </View>
