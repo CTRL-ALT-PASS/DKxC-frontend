@@ -10,7 +10,12 @@ import PaymentModeModal from "../../components/PaymentModeModal";
 import ProductCard from "../../components/ProductCard";
 import ProductOptionsModal from "../../components/ProductOptionsModal";
 import ProductGrid from "../../components/shared/ProductGrid";
-import { getUnitPrice, type Product } from "../../constants/mockData";
+import type { Product } from "../../constants/mockData";
+import {
+  formatOptions,
+  formatPromo,
+  getLineTotal,
+} from "../../constants/pricing";
 import { useAuth } from "../../context/AuthContext";
 import { useCart, type PaymentMode } from "../../context/CartContext";
 import { useProducts } from "../../hooks/use-products";
@@ -125,14 +130,26 @@ export default function POSScreen() {
                 </Text>
                 {entry.options && (
                   <Text className="text-xs text-slate-500">
-                    {Object.values(entry.options).join(", ")}
+                    {formatOptions(entry.options)}
+                  </Text>
+                )}
+                {!!entry.discountPercent && (
+                  <Text className="text-xs text-darcy font-medium">
+                    {formatPromo(
+                      entry.product,
+                      entry.options,
+                      entry.discountPercent,
+                    )}
                   </Text>
                 )}
               </View>
               <Text className="mr-2">
                 ₱
-                {(
-                  getUnitPrice(entry.product, entry.options) * entry.quantity
+                {getLineTotal(
+                  entry.product,
+                  entry.options,
+                  entry.quantity,
+                  entry.discountPercent,
                 ).toFixed(2)}
               </Text>
               <Pressable
@@ -205,9 +222,15 @@ export default function POSScreen() {
         product={activeProduct}
         visible={!!activeProduct}
         onClose={() => setActiveProduct(null)}
-        onConfirm={(options) =>
+        onConfirm={({ options, quantity, discountPercent }) =>
           activeProduct &&
-          dispatch({ type: "ADD", product: activeProduct, options })
+          dispatch({
+            type: "ADD_CUSTOMIZED",
+            product: activeProduct,
+            options,
+            quantity,
+            discountPercent,
+          })
         }
       />
 
