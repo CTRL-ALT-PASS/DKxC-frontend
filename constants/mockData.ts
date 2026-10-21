@@ -49,7 +49,7 @@ export const CURRENT_USER: User = {
 };
 
 export const CATEGORIES = [
-  "All Menu",
+  "All",
   "Coffee",
   "Non-Coffee",
   "Pastries",

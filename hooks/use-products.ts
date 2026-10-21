@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 // an admin's change shows up on the cashier's menu.
 export function useProducts() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>(["All Menu"]);
+  const [categories, setCategories] = useState<string[]>(["All"]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 

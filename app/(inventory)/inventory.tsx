@@ -1,5 +1,6 @@
-import searchIcon from "@/assets/icons/search.png";
-import { useMemo, useState } from "react";
+import SearchBar from "@/components/shared/SearchBar";
+import { useSearch } from "@/hooks/use-search";
+import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
 import Button from "../../components/Button";
 import InventoryRow, {
@@ -7,23 +8,19 @@ import InventoryRow, {
   InventoryItem,
 } from "../../components/inventory/inventory/InventoryRow";
 import StockAdjustSheet from "../../components/inventory/inventory/StockAdjustSheet";
-import TextField from "../../components/TextField";
 import { INVENTORY, LOW_STOCK_THRESHOLD } from "../../constants/mockData";
 
 export default function InventoryScreen() {
-  const [search, setSearch] = useState("");
   const [items, setItems] = useState<InventoryItem[]>(
     INVENTORY as InventoryItem[],
   );
   const [adjusting, setAdjusting] = useState<InventoryItem | null>(null);
 
-  const filtered = useMemo(
-    () =>
-      items.filter((i) =>
-        i.itemName.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [items, search],
-  );
+  const {
+    query,
+    setQuery,
+    results: filtered,
+  } = useSearch(items, (i) => i.itemName);
 
   // Local-only for now; swap for your API/store call later.
   const handleAdjust = (target: InventoryItem, deltaBase: number) => {
@@ -45,22 +42,15 @@ export default function InventoryScreen() {
 
   return (
     <View className="flex-1 bg-[#F4F6F4]">
-      {/* Top bar */}
-      <View className="h-20 px-8 flex-row items-center justify-between bg-white border-b border-[#DDE3E0]">
-        <Text className="text-[26px] font-bold text-[#1B2421]">Inventory</Text>
-        <Button label="Inventory Logs" variant="outline" />
-      </View>
-
       <View className="flex-1 p-8">
-        <View className="flex-row mb-4">
-          <TextField
-            icon={searchIcon}
+        <View className="flex-row items-center justify-between mb-4">
+          <SearchBar
+            value={query}
+            onChangeText={setQuery}
             placeholder="Search Item"
-            value={search}
-            onChangeText={setSearch}
-            className="flex-1 mr-3"
+            className="w-80 mr-3"
           />
-          <Button label="Search" variant="outline" />
+          <Button label="Inventory Logs" variant="outline" />
         </View>
 
         {/* Column labels (plain text, no filled header bar) */}
