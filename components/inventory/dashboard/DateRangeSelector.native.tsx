@@ -4,10 +4,10 @@ import { Calendar } from "lucide-react-native";
 import { useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import {
-    type DateRange,
-    type Timeframe,
-    matchesQuickRange,
-    quickRange,
+  type DateRange,
+  type Timeframe,
+  matchesQuickRange,
+  quickRange,
 } from "./chartData";
 
 interface DateRangeSelectorProps {
@@ -71,10 +71,10 @@ export default function DateRangeSelector({
           onPress={() => setPickerOpenFor("start")}
           className="flex-row items-center gap-1.5 rounded-full px-2 py-1"
         >
-          <Calendar size={15} color="#3F5A4A" />
-          <Text className="text-sm font-medium text-black">
+          <Calendar size={15} color="#BE185D" />
+          <Text className="text-sm font-medium text-secondary">
             {formatShort(range.start)}
-          </Text>
+          </Text>    
         </Pressable>
 
         <Text className="text-black/30">–</Text>
@@ -83,8 +83,8 @@ export default function DateRangeSelector({
           onPress={() => setPickerOpenFor("end")}
           className="flex-row items-center gap-1.5 rounded-full px-2 py-1"
         >
-          <Calendar size={15} color="#3F5A4A" />
-          <Text className="text-sm font-medium text-black">
+          <Calendar size={15} color="#BE185D" />
+          <Text className="text-sm font-medium text-secondary">
             {formatShort(range.end)}
           </Text>
         </Pressable>
@@ -102,9 +102,8 @@ export default function DateRangeSelector({
               className="rounded-full"
             >
               <LinearGradient
-                colors={
-                  active ? ["#4C6E5A", "#2B4335"] : ["#FFFFFF", "#FFFFFF"]
-                }
+                colors={active ? ["#E11D48", "#BE185D"] : ["#FFFFFF", "#FFFFFF"]}
+
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={{
@@ -112,13 +111,11 @@ export default function DateRangeSelector({
                   paddingVertical: 8,
                   borderRadius: 999,
                   borderWidth: active ? 0 : 1,
-                  borderColor: "rgba(0,0,0,0.15)",
+                  borderColor: "rgba(253,164,175,0.6)",
                 }}
               >
                 <Text
-                  className={`text-sm font-semibold ${
-                    active ? "text-white" : "text-black/70"
-                  }`}
+                  className={`text-sm font-semibold ${active ? "text-white" : "text-secondary/70"}`}
                 >
                   {tf}
                 </Text>

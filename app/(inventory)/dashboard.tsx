@@ -39,7 +39,7 @@ export default function Dashboard() {
   );
 
   return (
-    <ScrollView className="flex-1 bg-[#FAF8F3]" contentContainerClassName="p-6">
+    <ScrollView className="flex-1 bg-neutral" contentContainerClassName="p-6">
       {/* Placeholder for the header component you'll add later */}
       {/* <Text className="mb-6 text-3xl font-bold text-[#141813]">Dashboard</Text> */}
 
