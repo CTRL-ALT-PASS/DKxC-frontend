@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { cssInterop } from "nativewind";
 import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -8,7 +9,6 @@ import {
   Pressable,
   ScrollView,
   StatusBar,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -20,26 +20,21 @@ import mailIcon from "../assets/icons/mail.png";
 import logoLight from "../assets/images/darcys-logo-light.png";
 import { useAuth } from "../context/AuthContext";
 
-// Rosewood palette (from the design system)
-const COLORS = {
-  primary: "#BE185D",
-  primaryBright: "#E11D48",
-  secondary: "#4C0519",
-  tertiary: "#FB7185",
-  neutral: "#FFF1F2",
-  bgDeep: "#1A0208",
-  fieldBg: "#3A1220", // solid so browser autofill can't turn it white
-  fieldBorder: "rgba(255, 241, 242, 0.14)",
-  muted: "rgba(255, 241, 242, 0.55)",
-  faint: "rgba(255, 241, 242, 0.35)",
-  error: "#FDA4AF",
+cssInterop(LinearGradient, { className: "style" });
+
+// Props like gradient `colors`, `tintColor` and `placeholderTextColor` can't
+// take Tailwind classes, so they mirror tailwind.config.js. Keep in sync.
+const HEX = {
+  primary: "#BE185D", // primary
+  primaryBright: "#E11D48", // primary-bright
+  secondary: "#4C0519", // secondary
+  canvas: "#1A0208", // canvas
+  canvasMid: "#2A030F", // canvas-mid
+  field: "#3A1220", // field
+  neutral: "#FFF1F2", // neutral
+  neutralMuted: "rgba(255, 241, 242, 0.55)", // neutral/55
+  neutralFaint: "rgba(255, 241, 242, 0.35)", // neutral/35
 };
-
-// Logo already contains the business name, so it is the only brand element.
-const LOGO_SIZE = 220;
-
-// Fixed-width form column so web and Android tablet render identically.
-const FORM_WIDTH = 440;
 
 // Chrome autofill paints inputs light blue/white; force it to match the field.
 function useAutofillFix() {
@@ -50,9 +45,9 @@ function useAutofillFix() {
       input:-webkit-autofill,
       input:-webkit-autofill:hover,
       input:-webkit-autofill:focus {
-        -webkit-box-shadow: 0 0 0 1000px ${COLORS.fieldBg} inset !important;
-        -webkit-text-fill-color: ${COLORS.neutral} !important;
-        caret-color: ${COLORS.neutral} !important;
+        -webkit-box-shadow: 0 0 0 1000px ${HEX.field} inset !important;
+        -webkit-text-fill-color: ${HEX.neutral} !important;
+        caret-color: ${HEX.neutral} !important;
         transition: background-color 9999s ease-in-out 0s;
       }
     `;
@@ -106,55 +101,63 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <View className="flex-1 bg-canvas">
       <StatusBar barStyle="light-content" />
 
       {/* Background */}
       <LinearGradient
-        colors={[COLORS.secondary, "#2A030F", COLORS.bgDeep]}
+        colors={[HEX.secondary, HEX.canvasMid, HEX.canvas]}
         locations={[0, 0.55, 1]}
-        style={StyleSheet.absoluteFill}
+        className="absolute inset-0"
       />
-      {/* Soft radial-style glow (concentric circles work on web + Android) */}
-      <View pointerEvents="none" style={styles.glowWrap}>
-        <View style={[styles.glow, { width: 1100, height: 1100, opacity: 0.05 }]} />
-        <View style={[styles.glow, { width: 800, height: 800, opacity: 0.07 }]} />
-        <View style={[styles.glow, { width: 520, height: 520, opacity: 0.1 }]} />
+      {/* Soft glow (concentric circles work on web + Android) */}
+      <View
+        pointerEvents="none"
+        className="absolute inset-0 items-center justify-center"
+      >
+        <View className="absolute w-[1100px] h-[1100px] rounded-full bg-tertiary opacity-5" />
+        <View className="absolute w-[800px] h-[800px] rounded-full bg-tertiary opacity-[0.07]" />
+        <View className="absolute w-[520px] h-[520px] rounded-full bg-tertiary opacity-10" />
       </View>
 
       <KeyboardAvoidingView
-        style={styles.flex}
+        className="flex-1"
         behavior={Platform.OS === "android" ? "height" : "padding"}
       >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerClassName="flex-grow items-center justify-center px-6 py-6"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.form}>
+          <View className="w-full max-w-md">
+            {/* Logo already contains the business name */}
             <Image
               source={logoLight}
-              style={styles.logo}
+              style={{ width: 220, height: 220, alignSelf: "center" }}
               contentFit="contain"
             />
 
-            <Text style={styles.portalTitle}>STAFF PORTAL LOGIN</Text>
+            <Text className="mt-5 mb-6 text-center text-[11px] font-bold tracking-[2px] text-tertiary-soft">
+              STAFF PORTAL LOGIN
+            </Text>
 
             {/* Employee ID */}
-            <Text style={styles.label}>EMPLOYEE ID</Text>
-            <View style={styles.field}>
+            <Text className="mb-2 text-[10px] font-semibold tracking-[1px] text-neutral/55">
+              EMPLOYEE ID
+            </Text>
+            <View className="flex-row items-center gap-3 h-[52px] px-4 rounded-2xl bg-field border border-neutral/15">
               <Image
                 source={mailIcon}
-                style={styles.icon}
+                style={{ width: 20, height: 20 }}
                 contentFit="contain"
-                tintColor={COLORS.muted}
+                tintColor={HEX.neutralMuted}
               />
               <TextInput
-                style={styles.input}
+                className="flex-1 h-full bg-transparent text-sm font-semibold text-neutral outline-none"
                 value={employeeId}
                 onChangeText={setEmployeeId}
                 placeholder="DCY-000(sample)"
-                placeholderTextColor={COLORS.faint}
+                placeholderTextColor={HEX.neutralFaint}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 autoComplete="off"
@@ -163,25 +166,29 @@ export default function LoginScreen() {
             </View>
 
             {/* PIN */}
-            <View style={[styles.labelRow, { marginTop: 18 }]}>
-              <Text style={styles.label}>PIN</Text>
+            <View className="mt-[18px] flex-row items-center justify-between">
+              <Text className="mb-2 text-[10px] font-semibold tracking-[1px] text-neutral/55">
+                PIN
+              </Text>
               <Pressable hitSlop={8}>
-                <Text style={styles.forgot}>Forgot PIN?</Text>
+                <Text className="mb-2 text-[11px] font-medium text-tertiary">
+                  Forgot PIN?
+                </Text>
               </Pressable>
             </View>
-            <View style={styles.field}>
+            <View className="flex-row items-center gap-3 h-[52px] px-4 rounded-2xl bg-field border border-neutral/15">
               <Image
                 source={lockIcon}
-                style={styles.icon}
+                style={{ width: 20, height: 20 }}
                 contentFit="contain"
-                tintColor={COLORS.muted}
+                tintColor={HEX.neutralMuted}
               />
               <TextInput
-                style={styles.input}
+                className="flex-1 h-full bg-transparent text-sm font-semibold text-neutral outline-none"
                 value={pin}
                 onChangeText={setPin}
                 placeholder="Enter 5 pin number"
-                placeholderTextColor={COLORS.faint}
+                placeholderTextColor={HEX.neutralFaint}
                 secureTextEntry={!showPin}
                 keyboardType="number-pad"
                 autoComplete="off"
@@ -191,168 +198,48 @@ export default function LoginScreen() {
               <Pressable onPress={() => setShowPin((s) => !s)} hitSlop={10}>
                 <Image
                   source={showPin ? eyeIcon : eyeOffIcon}
-                  style={styles.icon}
+                  style={{ width: 20, height: 20 }}
                   contentFit="contain"
-                  tintColor={COLORS.muted}
+                  tintColor={HEX.neutralMuted}
                 />
               </Pressable>
             </View>
 
-            {!!error && <Text style={styles.error}>{error}</Text>}
+            {!!error && (
+              <Text className="mt-2.5 text-xs text-tertiary-soft">{error}</Text>
+            )}
 
             {/* Log in */}
             <Pressable
               onPress={handleLogin}
               disabled={loading}
-              style={({ pressed }) => [
-                styles.buttonWrap,
-                (pressed || loading) && { opacity: 0.7 },
-              ]}
+              className={`mt-6 rounded-2xl shadow-lg shadow-primary-bright/40 ${
+                loading ? "opacity-70" : "active:opacity-80"
+              }`}
             >
               <LinearGradient
-                colors={[COLORS.primaryBright, COLORS.primary]}
+                colors={[HEX.primaryBright, HEX.primary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.button}
+                className="h-[52px] rounded-2xl items-center justify-center"
               >
-                <Text style={styles.buttonText}>
+                <Text className="text-sm font-bold text-white">
                   {loading ? "Logging in..." : "Log In"}
                 </Text>
               </LinearGradient>
             </Pressable>
 
-            <Text style={styles.assist}>
-              Need assistance? <Text style={styles.assistLink}>Contact Manager</Text>
+            <Text className="mt-5 text-center text-[11px] text-neutral/35">
+              Need assistance?{" "}
+              <Text className="font-bold text-tertiary-soft">Contact Manager</Text>
             </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Text style={styles.footer}>
+      <Text className="pt-1.5 pb-[18px] text-center text-[10px] text-neutral/35">
         © Darcy's Kitchen × Café. All rights reserved. Point of Sale System.
       </Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.bgDeep },
-  flex: { flex: 1 },
-
-  glowWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  glow: {
-    position: "absolute",
-    borderRadius: 9999,
-    backgroundColor: COLORS.tertiary,
-  },
-
-  scroll: {
-    flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 24,
-    paddingHorizontal: 24,
-  },
-  form: { width: "100%", maxWidth: FORM_WIDTH },
-
-  logo: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-
-  portalTitle: {
-    fontWeight: "700",
-    fontSize: 11,
-    letterSpacing: 2,
-    color: "#FDA4AF",
-    textAlign: "center",
-    marginBottom: 22,
-  },
-
-  labelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  label: {
-    fontWeight: "600",
-    fontSize: 10,
-    letterSpacing: 1,
-    color: COLORS.muted,
-    marginBottom: 8,
-  },
-  forgot: {
-    fontWeight: "500",
-    fontSize: 11,
-    color: COLORS.tertiary,
-    marginBottom: 8,
-  },
-
-  field: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    height: 52,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: COLORS.fieldBg,
-    borderWidth: 1,
-    borderColor: COLORS.fieldBorder,
-  },
-  icon: { width: 20, height: 20 },
-  input: {
-    flex: 1,
-    height: "100%",
-    backgroundColor: "transparent",
-    fontWeight: "600",
-    fontSize: 14,
-    color: COLORS.neutral,
-    // removes the default focus outline on web
-    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null),
-  },
-
-  error: {
-    marginTop: 10,
-    fontSize: 12,
-    color: COLORS.error,
-  },
-
-  buttonWrap: {
-    marginTop: 26,
-    borderRadius: 14,
-    shadowColor: COLORS.primaryBright,
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-  },
-  button: {
-    height: 52,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonText: { fontWeight: "700", fontSize: 14, color: "#fff" },
-
-  assist: {
-    marginTop: 20,
-    textAlign: "center",
-    fontSize: 11,
-    color: COLORS.faint,
-  },
-  assistLink: { color: "#FDA4AF", fontWeight: "700" },
-
-  footer: {
-    textAlign: "center",
-    fontSize: 10,
-    color: COLORS.faint,
-    paddingBottom: 18,
-    paddingTop: 6,
-  },
-});
