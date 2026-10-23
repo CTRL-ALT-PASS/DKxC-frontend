@@ -13,16 +13,17 @@ import { View } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 
 const NAV = [
-  { key: "dashboard", icon: Activity, title: "Dashboard" },
-  { key: "sales", icon: ClipboardList, title: "Sales" },
+  { key: "dashboard", icon: Activity, title: "Dashboard", label: "Dashboard" },
+  { key: "sales", icon: ClipboardList, title: "Sales", label: "Sales" },
   {
     key: "products",
     icon: ShoppingBag,
     title: "Products",
+    label: "Products",
     alsoMatches: ["product-form"], // add/edit screen belongs to Products
   },
-  { key: "inventory", icon: Package, title: "Inventory" },
-  { key: "employees", icon: Users, title: "Employees" },
+  { key: "inventory", icon: Package, title: "Inventory", label: "Inventory" },
+  { key: "employees", icon: Users, title: "Employees", label: "Employees" },
 ];
 
 const matchesSection = (item: (typeof NAV)[number], pathname: string) =>
@@ -47,6 +48,7 @@ export default function TabsLayout() {
   const navItems = NAV.map((item) => ({
     key: item.key,
     icon: item.icon,
+    label: item.title,
     isActive: matchesSection(item, pathname),
     onPress: () => router.navigate(`/(inventory)/${item.key}` as any),
   }));
@@ -63,7 +65,7 @@ export default function TabsLayout() {
 
   return (
     <View className="flex-1 flex-row">
-      <Sidebar navItems={navItems} onLogout={handleLogout} logo={darcyMark} />
+      <Sidebar navItems={navItems} onLogout={handleLogout} logo={darcyMark} defaultCollapsed/>
       <View className="flex-1">
         <Header title={activeTitle} date={today} />
         <Slot />
