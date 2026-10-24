@@ -1,19 +1,18 @@
 import SearchBar from "@/components/shared/SearchBar";
+import { useInventory } from "@/hooks/use-inventory";
 import { useSearch } from "@/hooks/use-search";
 import { useState } from "react";
-import { FlatList, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Text, View } from "react-native";
 import Button from "../../components/Button";
 import InventoryRow, {
   COLUMN_WIDTHS,
   InventoryItem,
 } from "../../components/inventory/inventory/InventoryRow";
 import StockAdjustSheet from "../../components/inventory/inventory/StockAdjustSheet";
-import { INVENTORY, LOW_STOCK_THRESHOLD } from "../../constants/mockData";
 
 export default function InventoryScreen() {
-  const [items, setItems] = useState<InventoryItem[]>(
-    INVENTORY as InventoryItem[],
-  );
+  const { items, isLoading, isRefreshing, error, refresh, retry } =
+    useInventory();
   const [adjusting, setAdjusting] = useState<InventoryItem | null>(null);
 
   const {
@@ -22,21 +21,31 @@ export default function InventoryScreen() {
     results: filtered,
   } = useSearch(items, (i) => i.itemName);
 
-  // Local-only for now; swap for your API/store call later.
-  const handleAdjust = (target: InventoryItem, deltaBase: number) => {
-    const stamp = new Date().toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === target.id
-          ? { ...i, stocks: i.stocks + deltaBase, lastStockUpdate: stamp }
-          : i,
-      ),
+  // TODO (next step): call recordStockMovement() here, then refresh().
+  const handleAdjust = (_target: InventoryItem, _deltaBase: number) => {};
+
+  const renderEmpty = () => {
+    if (isLoading) {
+      return (
+        <View className="mt-12 items-center">
+          <ActivityIndicator size="large" color="#BE185D" />
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View className="mt-12 items-center">
+          <Text className="mb-4 text-center text-secondary/70">{error}</Text>
+          <Button label="Try Again" variant="outline" onPress={retry} />
+        </View>
+      );
+    }
+
+    return (
+      <Text className="text-center text-secondary/60 mt-8">
+        {query ? "No items found" : "No ingredients yet"}
+      </Text>
     );
   };
 
@@ -86,18 +95,12 @@ export default function InventoryScreen() {
           data={filtered}
           keyExtractor={(i) => i.id}
           ItemSeparatorComponent={() => <View className="h-3" />}
+          refreshing={isRefreshing}
+          onRefresh={refresh}
           renderItem={({ item }) => (
-            <InventoryRow
-              item={item}
-              lowStockThreshold={LOW_STOCK_THRESHOLD}
-              onPressAdjust={setAdjusting}
-            />
+            <InventoryRow item={item} onPressAdjust={setAdjusting} />
           )}
-          ListEmptyComponent={
-            <Text className="text-center text-secondary/60 mt-8">
-              No items found
-            </Text>
-          }
+          ListEmptyComponent={renderEmpty}
         />
       </View>
 

@@ -19,6 +19,7 @@ export type InventoryItem = {
   baseCost: number; // cost per 1 base unit
   lastStockUpdate: string; // display string, e.g. "Oct 15, 2026 · 3:42 PM"
   units?: StockUnit[]; // optional extra units besides the base unit
+  status: "Available" | "Low Stock" | "Out of Stock";
 };
 
 // Shared with the header so the columns always line up.
@@ -36,19 +37,18 @@ const fmt = (n: number) =>
 
 type Props = {
   item: InventoryItem;
-  lowStockThreshold: number;
   onPressAdjust?: (item: InventoryItem) => void;
   onPressMenu?: (item: InventoryItem) => void;
 };
 
 export default function InventoryRow({
   item,
-  lowStockThreshold,
   onPressAdjust,
   onPressMenu,
 }: Props) {
-  const isLow = item.stocks < lowStockThreshold;
-
+  const isOut = item.status === "Out of Stock";
+  const isLow = item.status !== "Available";
+  
   return (
     <View className="flex-row items-center h-16 px-5 bg-white border border-tertiary-soft/50 rounded-xl">
       <Text
@@ -80,7 +80,7 @@ export default function InventoryRow({
               resizeMode="contain"
             />
             <Text className="ml-1 text-[13px] font-semibold text-warn">
-              Low
+              {isOut ? "Out" : "Low"}
             </Text>
           </View>
         ) : (
