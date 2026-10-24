@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 interface RankedItem {
   name: string;
@@ -19,30 +19,53 @@ const BEST_SELLING_CATEGORIES: RankedItem[] = [
   { name: "Fruit tea", value: 200 },
 ];
 
-const RANK_TINTS = ["#3F5A4A", "#7C9484", "#B7C4BA"];
+// canvas -> secondary -> secondary at 70%, dark to light like the mockup
+const RANK_TINTS = ["#1A0208", "#4C0519", "#4C0519B3"];
 
-function RankedList({ title, items }: { title: string; items: RankedItem[] }) {
+function RankedList({
+  title,
+  items,
+  actionLabel,
+  onActionPress,
+}: {
+  title: string;
+  items: RankedItem[];
+  actionLabel?: string;
+  onActionPress?: () => void;
+}) {
   return (
     <View>
-      <Text className="text-base font-bold text-[#141813]">{title}</Text>
+      <View className="flex-row items-center justify-between">
+        <Text className="text-sm font-bold text-secondary">{title}</Text>
+        {actionLabel && (
+          <Pressable onPress={onActionPress} hitSlop={8}>
+            <Text className="text-xs font-medium text-primary">
+              {actionLabel}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
       <View className="mt-3">
         {items.map((item, index) => (
           <View
             key={item.name}
             className={`flex-row items-center gap-3 py-2.5 ${
-              index !== items.length - 1 ? "border-b border-black/[0.06]" : ""
+              index !== items.length - 1
+                ? "border-b border-tertiary-soft/30"
+                : ""
             }`}
           >
             <View
-              style={{ backgroundColor: RANK_TINTS[index] ?? "#B7C4BA" }}
+              style={{ backgroundColor: RANK_TINTS[index] ?? RANK_TINTS[2] }}
               className="h-6 w-6 items-center justify-center rounded-full"
             >
               <Text className="text-xs font-bold text-white">{index + 1}</Text>
             </View>
-            <Text className="flex-1 text-sm text-[#141813]" numberOfLines={1}>
+            <Text className="flex-1 text-sm text-secondary" numberOfLines={1}>
               {item.name}
             </Text>
-            <Text className="text-sm font-semibold text-[#141813]/70">
+            <Text className="text-sm font-semibold text-secondary">
               ₱{item.value}
             </Text>
           </View>
@@ -52,13 +75,31 @@ function RankedList({ title, items }: { title: string; items: RankedItem[] }) {
   );
 }
 
-export default function BestSelling() {
+interface BestSellingProps {
+  onViewAllPress?: () => void;
+  onBreakdownPress?: () => void;
+}
+
+export default function BestSelling({
+  onViewAllPress,
+  onBreakdownPress,
+}: BestSellingProps) {
   return (
-    <View className="gap-6 rounded-3xl bg-white p-5 shadow-sm">
-      <RankedList title="Best Selling Products" items={BEST_SELLING_PRODUCTS} />
+    <View className="rounded-3xl border border-tertiary-soft/40 bg-white p-5 shadow-sm">
+      <RankedList
+        title="Best Selling Products"
+        items={BEST_SELLING_PRODUCTS}
+        actionLabel="View All"
+        onActionPress={onViewAllPress}
+      />
+
+      <View className="my-4 h-px bg-tertiary-soft/40" />
+
       <RankedList
         title="Best Selling Categories"
         items={BEST_SELLING_CATEGORIES}
+        actionLabel="Breakdown"
+        onActionPress={onBreakdownPress}
       />
     </View>
   );

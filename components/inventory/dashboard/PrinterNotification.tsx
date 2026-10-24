@@ -1,4 +1,4 @@
-import { Printer, Settings, type LucideIcon } from "lucide-react-native";
+import { Printer, Settings } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 interface PrinterNotificationProps {
@@ -6,26 +6,17 @@ interface PrinterNotificationProps {
   onSettingsPress?: () => void;
 }
 
-const STATUS_CONFIG: Record<
-  "connected" | "disconnected",
-  {
-    color: string;
-    tint: string;
-    icon: LucideIcon;
-    label: string;
-    message: string;
-  }
-> = {
+const STATUS_CONFIG = {
   connected: {
-    color: "#2E7D46",
-    tint: "#E8F3EB",
+    color: "#34D399", // success
+    labelColor: "#065F46", // success.dark
     icon: Printer,
     label: "Printer ready",
     message: "Connected to Receipt Printer.",
   },
   disconnected: {
-    color: "#C0392B",
-    tint: "#FBE9E7",
+    color: "#BE185D", // primary
+    labelColor: "#BE185D",
     icon: Printer,
     label: "Printer offline",
     message: "Not connected to Receipt Printer.",
@@ -40,19 +31,26 @@ export default function PrinterNotification({
   const Icon = config.icon;
 
   return (
-    <View className="flex-row items-center gap-4 rounded-3xl bg-white p-5 shadow-sm">
+    <View className="flex-row items-center gap-4 rounded-3xl border border-tertiary-soft/40 bg-white p-5 shadow-sm">
       <View
-        style={{ backgroundColor: config.tint }}
-        className="h-11 w-11 items-center justify-center rounded-full"
+        style={{
+          backgroundColor: `${config.color}1F`,
+          borderColor: `${config.color}80`,
+          borderWidth: 1.5,
+        }}
+        className="h-11 w-11 items-center justify-center rounded-2xl"
       >
         <Icon size={20} color={config.color} />
       </View>
 
       <View className="flex-1">
-        <Text style={{ color: config.color }} className="text-xs font-semibold">
+        <Text
+          style={{ color: config.labelColor }}
+          className="text-xs font-bold uppercase tracking-wider"
+        >
           {config.label}
         </Text>
-        <Text className="mt-0.5 text-sm leading-5 text-[#141813]">
+        <Text className="mt-0.5 text-sm leading-5 text-secondary/80">
           {config.message}
         </Text>
       </View>
@@ -62,9 +60,9 @@ export default function PrinterNotification({
         hitSlop={12}
         accessibilityRole="button"
         accessibilityLabel="Printer settings"
-        className="h-9 w-9 items-center justify-center rounded-full active:bg-[#F1EEE6]"
+        className="h-9 w-9 items-center justify-center rounded-full active:bg-neutral"
       >
-        <Settings size={18} color="#6B6F68" />
+        <Settings size={18} color="#4C051999" />
       </Pressable>
     </View>
   );
