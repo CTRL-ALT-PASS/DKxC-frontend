@@ -282,8 +282,6 @@ export async function getInventoryItems(
     },
   });
 
-  console.log("RAW INVENTORY ITEM:", JSON.stringify(data[0], null, 2)); // temporary
-
   return data.map(mapInventoryItem);
 }
 

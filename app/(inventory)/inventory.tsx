@@ -4,6 +4,8 @@ import { useSearch } from "@/hooks/use-search";
 import { useState } from "react";
 import { ActivityIndicator, FlatList, Text, View } from "react-native";
 import Button from "../../components/Button";
+import type { InventoryItemPatch } from "../../components/inventory/inventory/InventoryItemActions";
+import InventoryItemActions from "../../components/inventory/inventory/InventoryItemActions";
 import InventoryRow, {
   COLUMN_WIDTHS,
   InventoryItem,
@@ -14,6 +16,7 @@ export default function InventoryScreen() {
   const { items, isLoading, isRefreshing, error, refresh, retry, recordMovement } =
     useInventory();
   const [adjusting, setAdjusting] = useState<InventoryItem | null>(null);
+  const [editing, setEditing] = useState<InventoryItem | null>(null);
 
   const {
     query,
@@ -23,6 +26,7 @@ export default function InventoryScreen() {
 
   // TODO (next step): call recordStockMovement() here, then refresh().
   const handleAdjust = (_target: InventoryItem, _deltaBase: number) => {};
+  const handleSaveItem = async (id: string, patch: InventoryItemPatch) => {};
 
   const renderEmpty = () => {
     if (isLoading) {
@@ -98,7 +102,7 @@ export default function InventoryScreen() {
           refreshing={isRefreshing}
           onRefresh={refresh}
           renderItem={({ item }) => (
-            <InventoryRow item={item} onPressAdjust={setAdjusting} />
+            <InventoryRow item={item} onPressAdjust={setAdjusting} onPressMenu={setEditing} />
           )}
           ListEmptyComponent={renderEmpty}
         />
@@ -109,6 +113,13 @@ export default function InventoryScreen() {
         onClose={() => setAdjusting(null)}
         onConfirm={recordMovement}
       />
+      
+      <InventoryItemActions
+        item={editing}
+        onClose={() => setEditing(null)}
+        onSave={handleSaveItem}
+      />
+
     </View>
   );
 }

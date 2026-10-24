@@ -2,6 +2,7 @@ import menuIcon from "@/assets/icons/menu.png";
 import warningIcon from "@/assets/icons/warning.png";
 import { Diff } from "lucide-react-native";
 import { Image, Pressable, Text, View } from "react-native";
+import { InventoryCategory } from "../../../types/inventoryCategories";
 
 // Alternative unit an item can be received/used in (e.g. Carton = 1000 mL).
 export type StockUnit = {
@@ -9,6 +10,7 @@ export type StockUnit = {
   name: string; // "Carton"
   note: string; // "1 L = 1,000 mL"
   factor: number; // how many base units in one of this unit
+  abbr?: string;   // NEW: "L", "BTL"
 };
 
 export type InventoryItem = {
@@ -20,6 +22,8 @@ export type InventoryItem = {
   lastStockUpdate: string; // display string, e.g. "Oct 15, 2026 · 3:42 PM"
   units?: StockUnit[]; // optional extra units besides the base unit
   status: "Available" | "Low Stock" | "Out of Stock";
+  reorderLevel?: number; // NEW: in base units
+  category?: InventoryCategory; // NEW
 };
 
 // Shared with the header so the columns always line up.
