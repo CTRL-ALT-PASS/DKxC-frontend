@@ -41,7 +41,7 @@ export default function InventoryScreen() {
   };
 
   return (
-    <View className="flex-1 bg-[#F4F6F4]">
+    <View className="flex-1 bg-neutral">
       <View className="flex-1 p-8">
         <View className="flex-row items-center justify-between mb-4">
           <SearchBar
@@ -55,26 +55,26 @@ export default function InventoryScreen() {
 
         {/* Column labels (plain text, no filled header bar) */}
         <View className="flex-row px-5 mb-3">
-          <Text className="flex-1 text-[13px] font-semibold text-[#5B6762]">
+          <Text className="flex-1 text-[13px] font-semibold text-secondary/70">
             Item Name
           </Text>
           <Text
-            className={`${COLUMN_WIDTHS.lastUpdate} text-[13px] font-semibold text-[#5B6762]`}
+            className={`${COLUMN_WIDTHS.lastUpdate} text-[13px] font-semibold text-secondary/70`}
           >
             Last Stock Update
           </Text>
           <Text
-            className={`${COLUMN_WIDTHS.stocks} text-[13px] font-semibold text-[#5B6762]`}
+            className={`${COLUMN_WIDTHS.stocks} text-[13px] font-semibold text-secondary/70`}
           >
             In Stock
           </Text>
           <Text
-            className={`${COLUMN_WIDTHS.status} text-[13px] font-semibold text-[#5B6762]`}
+            className={`${COLUMN_WIDTHS.status} text-[13px] font-semibold text-secondary/70`}
           >
             Status
           </Text>
           <Text
-            className={`${COLUMN_WIDTHS.baseCost} text-[13px] font-semibold text-[#5B6762]`}
+            className={`${COLUMN_WIDTHS.baseCost} text-[13px] font-semibold text-secondary/70`}
           >
             Base Cost
           </Text>
@@ -94,7 +94,7 @@ export default function InventoryScreen() {
             />
           )}
           ListEmptyComponent={
-            <Text className="text-center text-[#5B6762] mt-8">
+            <Text className="text-center text-secondary/60 mt-8">
               No items found
             </Text>
           }

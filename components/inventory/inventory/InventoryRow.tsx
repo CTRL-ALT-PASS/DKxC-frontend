@@ -50,56 +50,58 @@ export default function InventoryRow({
   const isLow = item.stocks < lowStockThreshold;
 
   return (
-    <View className="flex-row items-center h-16 px-5 bg-white border border-[#DDE3E0] rounded-xl">
+    <View className="flex-row items-center h-16 px-5 bg-white border border-tertiary-soft/50 rounded-xl">
       <Text
-        className="flex-1 text-[17px] font-semibold text-[#1B2421]"
+        className="flex-1 text-[17px] font-semibold text-secondary"
         numberOfLines={1}
       >
         {item.itemName}
       </Text>
 
       <Text
-        className={`${COLUMN_WIDTHS.lastUpdate} text-[15px] text-[#5B6762]`}
+        className={`${COLUMN_WIDTHS.lastUpdate} text-[15px] text-secondary/70`}
         numberOfLines={1}
       >
         {item.lastStockUpdate}
       </Text>
 
       <View className={`${COLUMN_WIDTHS.stocks} flex-row items-center`}>
-        <Text className="text-[17px] text-[#1B2421]">
+        <Text className="text-[17px] text-secondary">
           {fmt(item.stocks)} {item.unit}
         </Text>
       </View>
 
       <View className={`${COLUMN_WIDTHS.status} flex-row items-center`}>
         {isLow ? (
-          <View className="flex-row items-center bg-[#FDECEC] rounded-full px-3 py-1">
+          <View className="flex-row items-center bg-warn/10 rounded-full px-3 py-1">
             <Image
               source={warningIcon}
               style={{ width: 14, height: 14 }}
               resizeMode="contain"
             />
-            <Text className="ml-1 text-[13px] font-semibold text-[#9F1D1D]">
+            <Text className="ml-1 text-[13px] font-semibold text-warn">
               Low
             </Text>
           </View>
         ) : (
-          <View className="bg-[#E3F2EF] rounded-full px-3 py-1">
-            <Text className="text-[13px] font-semibold text-[#0B5C55]">OK</Text>
+          <View className="bg-success/20 rounded-full px-3 py-1">
+            <Text className="text-[13px] font-semibold text-success-dark">
+              OK
+            </Text>
           </View>
         )}
       </View>
 
-      <Text className={`${COLUMN_WIDTHS.baseCost} text-[17px] text-[#1B2421]`}>
+      <Text className={`${COLUMN_WIDTHS.baseCost} text-[17px] text-secondary`}>
         ₱{fmt(item.baseCost)}/{item.unit}
       </Text>
 
       <Pressable
         onPress={() => onPressAdjust?.(item)}
-        className={`h-10 w-10 mr-4 items-center justify-center rounded-lg border border-[#C9D1CD] bg-white active:bg-[#EEF2F0]`}
+        className="h-10 w-10 mr-4 items-center justify-center rounded-lg border border-tertiary-soft bg-white active:bg-neutral"
         accessibilityLabel={`Add or remove stock for ${item.itemName}`}
       >
-        <Diff size={20} color="#0F766E" strokeWidth={2} />
+        <Diff size={20} color="#BE185D" strokeWidth={2} />
       </Pressable>
 
       <Pressable

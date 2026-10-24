@@ -1,6 +1,6 @@
 import { Minus, Plus, X } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Easing, Modal, Pressable, Text, TextInput, View } from "react-native";
 import type { InventoryItem, StockUnit } from "./InventoryRow";
 
 type Mode = "add" | "remove";
@@ -17,29 +17,74 @@ const fmt = (n: number) =>
 
 const ADD_COLOR = "#0F766E";
 const REMOVE_COLOR = "#B91C1C";
+const PANEL_WIDTH = 540;
 
-export default function StockAdjustSheet({ item, onClose, onConfirm }: Props) {
+export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }: Props) {
+  // Keep the last item mounted so the panel can slide out before unmounting.
+  const [item, setItem] = useState<InventoryItem | null>(itemProp);
+  const open = itemProp !== null;
+
+  const translateX = useRef(new Animated.Value(PANEL_WIDTH)).current;
+  const backdrop = useRef(new Animated.Value(0)).current;
+
   const [mode, setMode] = useState<Mode>("add");
   const [qty, setQty] = useState("1");
   const [unitId, setUnitId] = useState("base");
+
+  // Follow the prop while open; hold the last value while closing.
+  useEffect(() => {
+    if (itemProp) setItem(itemProp);
+  }, [itemProp]);
+
+  // Slide in from the right / out to the right.
+  useEffect(() => {
+    if (open) {
+      translateX.setValue(PANEL_WIDTH);
+      backdrop.setValue(0);
+      Animated.parallel([
+        Animated.timing(translateX, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdrop, {
+          toValue: 1,
+          duration: 280,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(translateX, {
+          toValue: PANEL_WIDTH,
+          duration: 220,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdrop, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished) setItem(null); // unmount after the slide-out
+      });
+    }
+  }, [open]);
 
   // Reset whenever a different item is opened.
   useEffect(() => {
     setMode("add");
     setQty("1");
     setUnitId("base");
-  }, [item?.id]);
+  }, [itemProp?.id]);
 
   const units: StockUnit[] = useMemo(
     () =>
       item
         ? [
-            {
-              id: "base",
-              name: item.unit,
-              note: "Base unit",
-              factor: 1,
-            },
+            { id: "base", name: item.unit, note: "Base unit", factor: 1 },
             ...(item.units ?? []),
           ]
         : [],
@@ -69,221 +114,249 @@ export default function StockAdjustSheet({ item, onClose, onConfirm }: Props) {
     <Modal
       visible
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={onClose}
       supportedOrientations={["landscape", "portrait"]}
     >
-      {/* Dimmed backdrop; tap to dismiss */}
-      <Pressable
-        className="flex-1 bg-[#1B2421]/50 flex-row justify-end"
-        onPress={onClose}
-      >
-        {/* Right-hand panel; inner Pressable swallows taps */}
+      <View className="flex-1 flex-row justify-end">
+        {/* Fading dim layer; tap to dismiss */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            backgroundColor: "rgba(26,2,8,0.5)",
+            opacity: backdrop,
+          }}
+        />
         <Pressable
-          onPress={() => {}}
-          className="w-[540px] max-w-full h-full bg-white px-8 py-7 overflow-hidden"
-          style={{ elevation: 16 }}
+          onPress={onClose}
+          style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+        />
+
+        {/* Sliding panel */}
+        <Animated.View
+          style={{
+            width: PANEL_WIDTH,
+            maxWidth: "100%",
+            height: "100%",
+            transform: [{ translateX }],
+            elevation: 16,
+          }}
         >
-          {/* Header */}
-          <View className="flex-row items-start mb-4">
-            <View className="flex-1">
-              <Text className="text-[26px] font-bold text-[#1B2421]">
-                {item.itemName}
-              </Text>
-
-              <Text className="text-[15px] text-[#5B6762] mt-1">
-                In stock:{" "}
-                <Text className="font-bold text-[#1B2421]">
-                  {fmt(item.stocks)} {item.unit}
+          {/* Inner Pressable swallows taps */}
+          <Pressable
+            onPress={() => {}}
+            className="flex-1 bg-white px-8 py-7 overflow-hidden"
+          >
+            {/* Header */}
+            <View className="flex-row items-start mb-4">
+              <View className="flex-1">
+                <Text className="text-[26px] font-bold text-secondary">
+                  {item.itemName}
                 </Text>
-              </Text>
-            </View>
 
-            <Pressable
-              onPress={onClose}
-              accessibilityLabel="Close"
-              className="w-12 h-12 rounded-xl border border-[#C9D1CD] items-center justify-center"
-            >
-              <X size={22} color="#1B2421" strokeWidth={2} />
-            </Pressable>
-          </View>
-
-          {/* Add / Remove toggle */}
-          <View className="flex-row gap-1 p-1 bg-[#EEF2F0] rounded-[14px] mb-5">
-            {(["add", "remove"] as Mode[]).map((m) => {
-              const active = mode === m;
-              const activeColor = m === "remove" ? REMOVE_COLOR : ADD_COLOR;
-
-              return (
-                <Pressable
-                  key={m}
-                  onPress={() => setMode(m)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  className={`flex-1 h-[52px] rounded-[10px] items-center justify-center ${
-                    active ? "" : ""
-                  }`}
-                  style={active ? { backgroundColor: activeColor } : undefined}
-                >
-                  <Text
-                    className={`text-[17px] ${
-                      active
-                        ? "font-bold text-white"
-                        : "font-semibold text-[#34413C]"
-                    }`}
-                  >
-                    {m === "add" ? "Add stock" : "Remove stock"}
+                <Text className="text-[15px] text-secondary/70 mt-1">
+                  In stock:{" "}
+                  <Text className="font-bold text-secondary">
+                    {fmt(item.stocks)} {item.unit}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                </Text>
+              </View>
 
-          {/* Quantity */}
-          <Text className="text-sm font-semibold text-[#34413C] mb-2">
-            Quantity
-          </Text>
-
-          <View className="flex-row gap-[10px] mb-5">
-            <Pressable
-              onPress={() => setQty(String(Math.max(0, q - 1)))}
-              accessibilityLabel="Decrease quantity"
-              accessibilityRole="button"
-              className="w-16 h-16 shrink-0 rounded-xl border border-[#C9D1CD] items-center justify-center"
-            >
-              <Minus size={26} color="#1B2421" />
-            </Pressable>
-
-            <TextInput
-              value={qty}
-              onChangeText={setQty}
-              keyboardType="decimal-pad"
-              selectTextOnFocus
-              style={{ minWidth: 0, width: 0 }}
-              className="flex-1 min-w-0 h-16 text-center text-[32px] font-bold text-[#1B2421] border-[1.5px] border-[#0F766E] rounded-xl"
-            />
-
-            <Pressable
-              onPress={() => setQty(String(q + 1))}
-              accessibilityLabel="Increase quantity"
-              accessibilityRole="button"
-              className="w-16 h-16 shrink-0 rounded-xl border border-[#C9D1CD] items-center justify-center"
-            >
-              <Plus size={26} color="#1B2421" />
-            </Pressable>
-          </View>
-
-          {/* Unit picker */}
-          <Text className="text-sm font-semibold text-[#34413C] mb-2">
-            Unit
-          </Text>
-
-          <View className="flex-row flex-wrap gap-[10px] mb-5">
-            {units.map((u) => {
-              const sel = u.id === unit.id;
-
-              return (
-                <Pressable
-                  key={u.id}
-                  onPress={() => setUnitId(u.id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: sel }}
-                  className={`w-[48%] h-16 px-4 rounded-xl justify-center ${
-                    sel
-                      ? "border-2 border-[#0F766E] bg-[#E3F2EF]"
-                      : "border-[1.5px] border-[#C9D1CD] bg-white"
-                  }`}
-                >
-                  <Text
-                    className={`text-[17px] ${
-                      sel
-                        ? "font-bold text-[#0B5C55]"
-                        : "font-semibold text-[#1B2421]"
-                    }`}
-                  >
-                    {u.name}
-                  </Text>
-
-                  <Text
-                    className={`text-[13px] ${
-                      sel ? "text-[#0B5C55]" : "text-[#5B6762]"
-                    }`}
-                  >
-                    {u.note}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* Summary */}
-          <View className="bg-[#EEF2F0] rounded-[14px] px-[18px] py-4 gap-2">
-            <View className="flex-row justify-between">
-              <Text className="text-[15px] text-[#34413C]">{eq}</Text>
-
-              <Text className="text-[15px] font-bold text-[#34413C]">
-                {isAdd ? "+" : "−"}
-                {fmt(base)} {item.unit}
-              </Text>
-            </View>
-
-            <View className="h-px bg-[#D3DBD7]" />
-
-            <View className="flex-row justify-between items-baseline">
-              <Text className="text-[15px] text-[#34413C]">
-                New stock level
-              </Text>
-
-              <Text className="text-[26px] font-bold text-[#1B2421]">
-                {tooMuch ? "—" : `${fmt(next)} ${item.unit}`}
-              </Text>
-            </View>
-
-            {tooMuch && (
-              <Text className="text-sm font-semibold text-[#9F1D1D]">
-                Not enough stock. Only {fmt(item.stocks)} {item.unit} on hand.
-              </Text>
-            )}
-          </View>
-
-          <View className="flex-1" />
-
-          {/* Actions */}
-          <View className="flex-row gap-3">
-            <Pressable
-              onPress={onClose}
-              accessibilityRole="button"
-              className="h-14 px-7 rounded-xl border border-[#C9D1CD] items-center justify-center"
-            >
-              <Text className="text-[17px] font-semibold text-[#1B2421]">
-                Cancel
-              </Text>
-            </Pressable>
-
-            <Pressable
-              disabled={!canConfirm}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !canConfirm }}
-              onPress={() => {
-                onConfirm(item, isAdd ? base : -base, mode);
-                onClose();
-              }}
-              className="flex-1 h-14 rounded-xl items-center justify-center"
-              style={{
-                backgroundColor: canConfirm ? actionColor : "#E3E8E5",
-              }}
-            >
-              <Text
-                className={`text-[18px] font-bold ${
-                  canConfirm ? "text-white" : "text-[#5B6762]"
-                }`}
+              <Pressable
+                onPress={onClose}
+                accessibilityLabel="Close"
+                className="w-12 h-12 rounded-xl border border-tertiary-soft items-center justify-center"
               >
-                {isAdd ? "Add to stock" : "Remove from stock"}
-              </Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Pressable>
+                <X size={22} color="#4C0519" strokeWidth={2} />
+              </Pressable>
+            </View>
+
+            {/* Add / Remove toggle */}
+            <View className="flex-row gap-1 p-1 bg-neutral rounded-[14px] mb-5">
+              {(["add", "remove"] as Mode[]).map((m) => {
+                const active = mode === m;
+                const activeColor = m === "remove" ? REMOVE_COLOR : ADD_COLOR;
+
+                return (
+                  <Pressable
+                    key={m}
+                    onPress={() => setMode(m)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    className="flex-1 h-[52px] rounded-[10px] items-center justify-center"
+                    style={active ? { backgroundColor: activeColor } : undefined}
+                  >
+                    <Text
+                      className={`text-[17px] ${
+                        active
+                          ? "font-bold text-white"
+                          : "font-semibold text-secondary"
+                      }`}
+                    >
+                      {m === "add" ? "Add stock" : "Remove stock"}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Quantity */}
+            <Text className="text-sm font-semibold text-secondary mb-2">
+              Quantity
+            </Text>
+
+            <View className="flex-row gap-[10px] mb-5">
+              <Pressable
+                onPress={() => setQty(String(Math.max(0, q - 1)))}
+                accessibilityLabel="Decrease quantity"
+                accessibilityRole="button"
+                className="w-16 h-16 shrink-0 rounded-xl border border-[#C9D1CD] items-center justify-center"
+              >
+                <Minus size={26} color="#1B2421" />
+              </Pressable>
+
+              <TextInput
+                value={qty}
+                onChangeText={setQty}
+                keyboardType="decimal-pad"
+                selectTextOnFocus
+                style={{ minWidth: 0, width: 0 }}
+                className="flex-1 min-w-0 h-16 text-center text-[32px] font-bold text-secondary border-[1.5px] border-primary rounded-xl"
+              />
+
+              <Pressable
+                onPress={() => setQty(String(q + 1))}
+                accessibilityLabel="Increase quantity"
+                accessibilityRole="button"
+                className="w-16 h-16 shrink-0 rounded-xl border border-[#C9D1CD] items-center justify-center"
+              >
+                <Plus size={26} color="#1B2421" />
+              </Pressable>
+            </View>
+
+            {/* Unit picker */}
+            <Text className="text-sm font-semibold text-secondary mb-2">
+              Unit
+            </Text>
+
+            <View className="flex-row flex-wrap gap-[10px] mb-5">
+              {units.map((u) => {
+                const sel = u.id === unit.id;
+
+                return (
+                  <Pressable
+                    key={u.id}
+                    onPress={() => setUnitId(u.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: sel }}
+                    className={`w-[48%] h-16 px-4 rounded-xl justify-center ${
+                      sel
+                        ? "border-2 border-primary bg-neutral"
+                        : "border-[1.5px] border-tertiary-soft/60 bg-white"
+                    }`}
+                  >
+                    <Text
+                      className={`text-[17px] ${
+                        sel
+                          ? "font-bold text-primary"
+                          : "font-semibold text-secondary"
+                      }`}
+                    >
+                      {u.name}
+                    </Text>
+
+                    <Text
+                      className={`text-[13px] ${
+                        sel ? "text-primary" : "text-secondary/70"
+                      }`}
+                    >
+                      {u.note}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Summary */}
+            <View className="bg-neutral border border-tertiary-soft/40 rounded-[14px] px-[18px] py-4 gap-2">
+              <View className="flex-row justify-between">
+                <Text className="text-[15px] text-secondary/80">{eq}</Text>
+
+                <Text
+                  className="text-[15px] font-bold"
+                  style={{ color: actionColor }}
+                >
+                  {isAdd ? "+" : "−"}
+                  {fmt(base)} {item.unit}
+                </Text>
+              </View>
+
+              <View className="h-px bg-tertiary-soft/50" />
+
+              <View className="flex-row justify-between items-baseline">
+                <Text className="text-[15px] text-secondary/80">
+                  New stock level
+                </Text>
+
+                <Text className="text-[26px] font-bold text-secondary">
+                  {tooMuch ? "—" : `${fmt(next)} ${item.unit}`}
+                </Text>
+              </View>
+
+              {tooMuch && (
+                <Text className="text-sm font-semibold text-warn">
+                  Not enough stock. Only {fmt(item.stocks)} {item.unit} on hand.
+                </Text>
+              )}
+            </View>
+
+            <View className="flex-1" />
+
+            {/* Actions */}
+            <View className="flex-row gap-3">
+              <Pressable
+                onPress={onClose}
+                accessibilityRole="button"
+                className="h-14 px-7 rounded-xl border border-tertiary-soft items-center justify-center"
+              >
+                <Text className="text-[17px] font-semibold text-secondary">
+                  Cancel
+                </Text>
+              </Pressable>
+
+              <Pressable
+                disabled={!canConfirm}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !canConfirm }}
+                onPress={() => {
+                  onConfirm(item, isAdd ? base : -base, mode);
+                  onClose();
+                }}
+                className="flex-1 h-14 rounded-xl items-center justify-center"
+                style={{
+                  backgroundColor: canConfirm
+                    ? actionColor
+                    : "rgba(253,164,175,0.3)",
+                }}
+              >
+                <Text
+                  className={`text-[18px] font-bold ${
+                    canConfirm ? "text-white" : "text-secondary/50"
+                  }`}
+                >
+                  {isAdd ? "Add to stock" : "Remove from stock"}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Animated.View>
+      </View>
     </Modal>
   );
+
 }
