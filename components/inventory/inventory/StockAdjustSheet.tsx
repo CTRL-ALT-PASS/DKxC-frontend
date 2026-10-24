@@ -1,3 +1,8 @@
+import {
+  ApiError,
+  type MovementType,
+  type RecordMovementInput,
+} from "@/services/inventoryApi";
 import { Minus, Plus, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Modal, Pressable, Text, TextInput, View } from "react-native";
@@ -8,8 +13,11 @@ type Mode = "add" | "remove";
 type Props = {
   item: InventoryItem | null; // null = closed
   onClose: () => void;
-  /** delta is in BASE units; positive for add, negative for remove */
-  onConfirm: (item: InventoryItem, deltaBase: number, mode: Mode) => void;
+  /**
+   * Should send the movement to the backend. Reject/throw on failure so the
+   * sheet can show the error and stay open; resolve on success.
+   */
+  onConfirm: (item: InventoryItem, input: RecordMovementInput) => Promise<void>;
 };
 
 const fmt = (n: number) =>
@@ -18,6 +26,35 @@ const fmt = (n: number) =>
 const ADD_COLOR = "#0F766E";
 const REMOVE_COLOR = "#B91C1C";
 const PANEL_WIDTH = 540;
+
+// Which backend movement types each mode offers.
+const TYPE_OPTIONS: Record<Mode, { value: MovementType; label: string }[]> = {
+  add: [
+    { value: "Restock", label: "Restock" },
+    { value: "Return", label: "Return" },
+    { value: "Adjustment", label: "Adjustment" },
+  ],
+  remove: [
+    { value: "Spoilage", label: "Spoilage" },
+    { value: "Damage", label: "Damage" },
+    { value: "Adjustment", label: "Adjustment" },
+  ],
+};
+
+const DEFAULT_TYPE: Record<Mode, MovementType> = {
+  add: "Restock",
+  remove: "Spoilage",
+};
+
+function errorMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    // 422: show the first field error; 403 INSUFFICIENT_STOCK etc: server message.
+    const firstFieldError =
+      e.fieldErrors && Object.values(e.fieldErrors)[0]?.[0];
+    return firstFieldError ?? e.message;
+  }
+  return "Couldn't update stock. Check your connection and try again.";
+}
 
 export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }: Props) {
   // Keep the last item mounted so the panel can slide out before unmounting.
@@ -28,8 +65,12 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
   const backdrop = useRef(new Animated.Value(0)).current;
 
   const [mode, setMode] = useState<Mode>("add");
+  const [type, setType] = useState<MovementType>("Restock");
   const [qty, setQty] = useState("1");
   const [unitId, setUnitId] = useState("base");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Follow the prop while open; hold the last value while closing.
   useEffect(() => {
@@ -76,8 +117,12 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
   // Reset whenever a different item is opened.
   useEffect(() => {
     setMode("add");
+    setType("Restock");
     setQty("1");
     setUnitId("base");
+    setReason("");
+    setError(null);
+    setSubmitting(false);
   }, [itemProp?.id]);
 
   const units: StockUnit[] = useMemo(
@@ -91,6 +136,17 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
     [item],
   );
 
+  // Don't allow dismissing while a request is in flight.
+  const requestClose = () => {
+    if (!submitting) onClose();
+  };
+
+  const changeMode = (m: Mode) => {
+    setMode(m);
+    setType(DEFAULT_TYPE[m]);
+    setError(null);
+  };
+
   if (!item) return null;
 
   const unit = units.find((u) => u.id === unitId) ?? units[0];
@@ -100,7 +156,7 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
   const isAdd = mode === "add";
   const next = isAdd ? item.stocks + base : item.stocks - base;
   const tooMuch = !isAdd && next < 0;
-  const canConfirm = q > 0 && !tooMuch;
+  const canConfirm = q > 0 && !tooMuch && !submitting;
 
   const eq =
     unit.factor === 1
@@ -110,12 +166,36 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
   // Use teal for adding and red for removing stock.
   const actionColor = isAdd ? ADD_COLOR : REMOVE_COLOR;
 
+  const handleConfirm = async () => {
+    if (!canConfirm) return;
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await onConfirm(item, {
+        movement_type: type,
+        // Only "Adjustment" takes a signed quantity; Spoilage/Damage are
+        // positive and the backend subtracts them.
+        quantity: !isAdd && type === "Adjustment" ? -q : q,
+        // Send the unit the employee picked; the backend converts to base.
+        unit: unit.id === "base" ? item.unit : unit.name,
+        ...(reason.trim() && { reason: reason.trim() }),
+      });
+      onClose();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <Modal
       visible
       transparent
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={requestClose}
       supportedOrientations={["landscape", "portrait"]}
     >
       <View className="flex-1 flex-row justify-end">
@@ -133,7 +213,7 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
           }}
         />
         <Pressable
-          onPress={onClose}
+          onPress={requestClose}
           style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
         />
 
@@ -168,7 +248,7 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
               </View>
 
               <Pressable
-                onPress={onClose}
+                onPress={requestClose}
                 accessibilityLabel="Close"
                 className="w-12 h-12 rounded-xl border border-tertiary-soft items-center justify-center"
               >
@@ -185,7 +265,8 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
                 return (
                   <Pressable
                     key={m}
-                    onPress={() => setMode(m)}
+                    onPress={() => changeMode(m)}
+                    disabled={submitting}
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
                     className="flex-1 h-[52px] rounded-[10px] items-center justify-center"
@@ -205,6 +286,42 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
               })}
             </View>
 
+            {/* Movement type */}
+            <Text className="text-sm font-semibold text-secondary mb-2">
+              Type
+            </Text>
+
+            <View className="flex-row gap-[10px] mb-5">
+              {TYPE_OPTIONS[mode].map((t) => {
+                const sel = t.value === type;
+
+                return (
+                  <Pressable
+                    key={t.value}
+                    onPress={() => setType(t.value)}
+                    disabled={submitting}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: sel }}
+                    className={`flex-1 h-12 rounded-xl items-center justify-center ${
+                      sel
+                        ? "border-2 border-primary bg-neutral"
+                        : "border-[1.5px] border-tertiary-soft/60 bg-white"
+                    }`}
+                  >
+                    <Text
+                      className={`text-[15px] ${
+                        sel
+                          ? "font-bold text-primary"
+                          : "font-semibold text-secondary"
+                      }`}
+                    >
+                      {t.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             {/* Quantity */}
             <Text className="text-sm font-semibold text-secondary mb-2">
               Quantity
@@ -213,6 +330,7 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
             <View className="flex-row gap-[10px] mb-5">
               <Pressable
                 onPress={() => setQty(String(Math.max(0, q - 1)))}
+                disabled={submitting}
                 accessibilityLabel="Decrease quantity"
                 accessibilityRole="button"
                 className="w-16 h-16 shrink-0 rounded-xl border border-[#C9D1CD] items-center justify-center"
@@ -223,6 +341,7 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
               <TextInput
                 value={qty}
                 onChangeText={setQty}
+                editable={!submitting}
                 keyboardType="decimal-pad"
                 selectTextOnFocus
                 style={{ minWidth: 0, width: 0 }}
@@ -231,6 +350,7 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
 
               <Pressable
                 onPress={() => setQty(String(q + 1))}
+                disabled={submitting}
                 accessibilityLabel="Increase quantity"
                 accessibilityRole="button"
                 className="w-16 h-16 shrink-0 rounded-xl border border-[#C9D1CD] items-center justify-center"
@@ -252,6 +372,7 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
                   <Pressable
                     key={u.id}
                     onPress={() => setUnitId(u.id)}
+                    disabled={submitting}
                     accessibilityRole="button"
                     accessibilityState={{ selected: sel }}
                     className={`w-[48%] h-16 px-4 rounded-xl justify-center ${
@@ -281,6 +402,16 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
                 );
               })}
             </View>
+
+            {/* Reason (optional, max 50 chars on the backend) */}
+            <TextInput
+              value={reason}
+              onChangeText={setReason}
+              editable={!submitting}
+              maxLength={50}
+              placeholder="Reason (optional)"
+              className="h-12 px-4 mb-5 text-[16px] text-secondary border border-tertiary-soft rounded-xl"
+            />
 
             {/* Summary */}
             <View className="bg-neutral border border-tertiary-soft/40 rounded-[14px] px-[18px] py-4 gap-2">
@@ -315,12 +446,20 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
               )}
             </View>
 
+            {/* Server error (e.g. insufficient stock, validation, network) */}
+            {error && (
+              <Text className="mt-3 text-sm font-semibold text-warn">
+                {error}
+              </Text>
+            )}
+
             <View className="flex-1" />
 
             {/* Actions */}
             <View className="flex-row gap-3">
               <Pressable
-                onPress={onClose}
+                onPress={requestClose}
+                disabled={submitting}
                 accessibilityRole="button"
                 className="h-14 px-7 rounded-xl border border-tertiary-soft items-center justify-center"
               >
@@ -333,10 +472,7 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
                 disabled={!canConfirm}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: !canConfirm }}
-                onPress={() => {
-                  onConfirm(item, isAdd ? base : -base, mode);
-                  onClose();
-                }}
+                onPress={handleConfirm}
                 className="flex-1 h-14 rounded-xl items-center justify-center"
                 style={{
                   backgroundColor: canConfirm
@@ -349,7 +485,11 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
                     canConfirm ? "text-white" : "text-secondary/50"
                   }`}
                 >
-                  {isAdd ? "Add to stock" : "Remove from stock"}
+                  {submitting
+                    ? "Saving…"
+                    : isAdd
+                      ? "Add to stock"
+                      : "Remove from stock"}
                 </Text>
               </Pressable>
             </View>
@@ -358,5 +498,4 @@ export default function StockAdjustSheet({ item: itemProp, onClose, onConfirm }:
       </View>
     </Modal>
   );
-
 }

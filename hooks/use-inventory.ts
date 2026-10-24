@@ -2,11 +2,14 @@ import type {
   InventoryItem,
   StockUnit,
 } from "@/components/inventory/inventory/InventoryRow";
+
 import { useAuth } from "@/context/AuthContext";
 import { getAuthToken } from "@/services/authStorage";
 import {
   getInventoryItems,
+  recordStockMovement,
   type InventoryItem as ApiInventoryItem,
+  type RecordMovementInput,
 } from "@/services/inventoryApi";
 import { useCallback, useEffect, useState } from "react";
 
@@ -103,5 +106,35 @@ export function useInventory() {
   const refresh = useCallback(() => load("refresh"), [load]);
   const retry = useCallback(() => load("initial"), [load]);
 
-  return { items, isLoading, isRefreshing, error, refresh, retry };
+  const recordMovement = useCallback(
+  async (item: InventoryItem, input: RecordMovementInput) => {
+    const token = await getAuthToken();
+
+    if (!token) {
+      await signOut();
+      throw new Error("SESSION_INVALID");
+    }
+
+    try {
+      const result = await recordStockMovement(
+        token,
+        Number(item.id),
+        input,
+      );
+
+      // The response already has the new quantity, status and last_restocked,
+      // so update that one row instead of refetching the whole list.
+      const updated = toUiItem(result.inventory_item);
+      setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+    } catch (e) {
+      if (e instanceof Error && e.message === "SESSION_INVALID") {
+        await signOut();
+      }
+      throw e; // let the sheet show the error
+    }
+  },
+  [signOut],
+);
+
+  return { items, isLoading, isRefreshing, error, refresh, retry, recordMovement };
 }

@@ -11,7 +11,7 @@ import InventoryRow, {
 import StockAdjustSheet from "../../components/inventory/inventory/StockAdjustSheet";
 
 export default function InventoryScreen() {
-  const { items, isLoading, isRefreshing, error, refresh, retry } =
+  const { items, isLoading, isRefreshing, error, refresh, retry, recordMovement } =
     useInventory();
   const [adjusting, setAdjusting] = useState<InventoryItem | null>(null);
 
@@ -107,7 +107,7 @@ export default function InventoryScreen() {
       <StockAdjustSheet
         item={adjusting}
         onClose={() => setAdjusting(null)}
-        onConfirm={handleAdjust}
+        onConfirm={recordMovement}
       />
     </View>
   );
