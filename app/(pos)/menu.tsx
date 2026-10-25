@@ -1,7 +1,13 @@
 import SearchBar from "@/components/shared/SearchBar";
 import { useSearch } from "@/hooks/use-search";
 import { useMemo, useState } from "react";
-import { Pressable, Text, useWindowDimensions, View } from "react-native";
+import {
+  Pressable,
+  Switch,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import addIcon from "../../assets/icons/basket-add.png";
 import chevronIcon from "../../assets/icons/chevron-down.png";
 import CategoryDropdown from "../../components/CategoryDropdown";
@@ -15,6 +21,7 @@ import {
   formatOptions,
   formatPromo,
   getLineTotal,
+  SENIOR_PWD_DISCOUNT_PERCENT,
 } from "../../constants/pricing";
 import { useAuth } from "../../context/AuthContext";
 import { useCart, type PaymentMode } from "../../context/CartContext";
@@ -32,8 +39,17 @@ export default function POSScreen() {
   const [category, setCategory] = useState("All");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const { items, list, total, orderType, dispatch, completeTransaction } =
-    useCart();
+  const {
+    items,
+    list,
+    subtotal,
+    seniorPwdDiscount,
+    isSeniorPwd,
+    total,
+    orderType,
+    dispatch,
+    completeTransaction,
+  } = useCart();
   const isCartEmpty = list.length === 0;
   const summaryWidth = Math.min(320, Math.max(220, Math.round(width * 0.22)));
 
@@ -162,6 +178,25 @@ export default function POSScreen() {
           ))}
 
           <View className="mt-auto pt-4 border-t border-slate-200">
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="flex-1 pr-3">
+                <Text className="text-sm font-semibold text-slate-800">
+                  PWD / Senior Citizen
+                </Text>
+                <Text className="text-xs text-slate-500">
+                  {SENIOR_PWD_DISCOUNT_PERCENT}% off the order
+                </Text>
+              </View>
+              <Switch
+                value={isSeniorPwd}
+                onValueChange={(enabled) =>
+                  dispatch({ type: "SET_SENIOR_PWD", enabled })
+                }
+                trackColor={{ false: "#CBD5E1", true: "#1F3D2B" }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+
             <View className="flex-row gap-2 mb-4">
               <Pressable
                 onPress={() => chooseOrderType("Dine In")}
@@ -206,6 +241,25 @@ export default function POSScreen() {
                 </Text>
               </Pressable>
             </View>
+
+            {isSeniorPwd && (
+              <>
+                <View className="flex-row justify-between mb-1">
+                  <Text className="text-sm text-slate-500">Subtotal</Text>
+                  <Text className="text-sm text-slate-500">
+                    ₱{subtotal.toFixed(2)}
+                  </Text>
+                </View>
+                <View className="flex-row justify-between mb-2">
+                  <Text className="text-sm text-darcy font-medium">
+                    PWD / Senior ({SENIOR_PWD_DISCOUNT_PERCENT}%)
+                  </Text>
+                  <Text className="text-sm text-darcy font-medium">
+                    −₱{seniorPwdDiscount.toFixed(2)}
+                  </Text>
+                </View>
+              </>
+            )}
 
             <View className="flex-row justify-between">
               <Text className="font-semibold">

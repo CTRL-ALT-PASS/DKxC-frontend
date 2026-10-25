@@ -42,3 +42,20 @@ export function formatPromo(
   const amount = getDiscountAmount(getUnitPrice(product, options), percent);
   return `${percent}% promo (−₱${amount.toFixed(2)})`;
 }
+
+// PWD / Senior Citizen discount: 20% off the whole order, switched on with the
+// toggle in the order summary. Both groups get the same rate. It comes off the
+// order subtotal (which already includes any per-drink promo).
+export const SENIOR_PWD_DISCOUNT_PERCENT = 20;
+
+export function getOrderTotals(subtotal: number, seniorPwd: boolean) {
+  const roundedSubtotal = toPesos(subtotal);
+  const seniorPwdDiscount = seniorPwd
+    ? toPesos((roundedSubtotal * SENIOR_PWD_DISCOUNT_PERCENT) / 100)
+    : 0;
+  return {
+    subtotal: roundedSubtotal,
+    seniorPwdDiscount,
+    total: toPesos(roundedSubtotal - seniorPwdDiscount),
+  };
+}

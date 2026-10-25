@@ -1,7 +1,7 @@
 import darcyMark from "@/assets/icons/darcy-mark.png";
 import Sidebar from "@/components/Sidebar";
 import { Slot, usePathname, useRouter } from "expo-router";
-import { LayoutGrid, ShoppingBag } from "lucide-react-native";
+import { Clock, History, LayoutGrid } from "lucide-react-native";
 import { View } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 
@@ -27,8 +27,14 @@ export default function TabsLayout() {
       onPress: () => router.navigate("/menu"),
     },
     {
-      key: "checkout",
-      icon: ShoppingBag,
+      key: "pending",
+      icon: Clock,
+      isActive: pathname === "/pending",
+      onPress: () => router.navigate("/pending"),
+    },
+    {
+      key: "history",
+      icon: History,
       isActive: pathname === "/checkout",
       onPress: () => router.navigate("/checkout"),
     },
