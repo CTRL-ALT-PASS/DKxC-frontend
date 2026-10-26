@@ -1,13 +1,17 @@
 import { ScrollView, Text, View } from "react-native";
-import chevronIcon from "../../assets/icons/chevron-down.png";
 import Header from "../../components/Header";
-import { getUnitPrice } from "../../constants/mockData";
+import {
+  formatOptions,
+  formatPromo,
+  getLineTotal,
+  SENIOR_PWD_DISCOUNT_PERCENT,
+} from "../../constants/pricing";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 
 export default function TransactionHistoryScreen() {
   const { user } = useAuth();
-  const { transactions } = useCart();
+  const { myTransactions } = useCart();
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -20,20 +24,20 @@ export default function TransactionHistoryScreen() {
   return (
     <View className="flex-1 bg-cream">
       <Header
-        title="Transaction History"
+        title="Order History"
         date={today}
-        user={user}
-        chevronIcon={chevronIcon}
+        // user={user}
+        // chevronIcon={chevronIcon}
       />
 
       <ScrollView className="flex-1 p-6">
-        {transactions.length === 0 && (
+        {myTransactions.length === 0 && (
           <Text className="text-slate-400 text-center mt-12">
-            No completed transactions yet.
+            You haven&apos;t processed any orders yet.
           </Text>
         )}
 
-        {transactions.map((tx) => (
+        {myTransactions.map((tx) => (
           <View key={tx.id} className="bg-white rounded-2xl p-5 mb-4 max-w-xl">
             <View className="flex-row justify-between items-center mb-3">
               <Text className="font-semibold text-darcy">
@@ -64,22 +68,54 @@ export default function TransactionHistoryScreen() {
                   </Text>
                   {entry.options && (
                     <Text className="text-xs text-slate-500">
-                      {Object.values(entry.options).join(", ")}
+                      {formatOptions(entry.options)}
+                    </Text>
+                  )}
+                  {!!entry.discountPercent && (
+                    <Text className="text-xs text-darcy font-medium">
+                      {formatPromo(
+                        entry.product,
+                        entry.options,
+                        entry.discountPercent,
+                      )}
                     </Text>
                   )}
                 </View>
                 <Text className="text-sm">
                   ₱
-                  {(
-                    getUnitPrice(entry.product, entry.options) * entry.quantity
+                  {getLineTotal(
+                    entry.product,
+                    entry.options,
+                    entry.quantity,
+                    entry.discountPercent,
                   ).toFixed(2)}
                 </Text>
               </View>
             ))}
 
-            <View className="flex-row justify-between mt-3 pt-3 border-t border-slate-200">
-              <Text className="font-semibold">Total</Text>
-              <Text className="font-semibold">₱{tx.total.toFixed(2)}</Text>
+            <View className="mt-3 pt-3 border-t border-slate-200">
+              {!!tx.seniorPwdDiscount && (
+                <>
+                  <View className="flex-row justify-between mb-1">
+                    <Text className="text-sm text-slate-500">Subtotal</Text>
+                    <Text className="text-sm text-slate-500">
+                      ₱{tx.subtotal.toFixed(2)}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between mb-2">
+                    <Text className="text-sm text-darcy font-medium">
+                      PWD / Senior ({SENIOR_PWD_DISCOUNT_PERCENT}%)
+                    </Text>
+                    <Text className="text-sm text-darcy font-medium">
+                      −₱{tx.seniorPwdDiscount.toFixed(2)}
+                    </Text>
+                  </View>
+                </>
+              )}
+              <View className="flex-row justify-between">
+                <Text className="font-semibold">Total</Text>
+                <Text className="font-semibold">₱{tx.total.toFixed(2)}</Text>
+              </View>
             </View>
           </View>
         ))}

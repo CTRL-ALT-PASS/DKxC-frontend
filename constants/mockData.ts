@@ -16,6 +16,8 @@ export interface ProductSpecGroup {
   key: string;
   label: string;
   options: ProductSpecOption[];
+  section?: string; // heading shown above this group in the options modal (consecutive groups share one)
+  defaultLabel?: string; // option preselected when the modal opens; falls back to the first option
 }
 
 export interface Product {
@@ -55,14 +57,16 @@ export const CATEGORIES = [
   "Other",
 ];
 
-// Shared by every drink product. priceDelta is added on top of the product's
-// base price for that one cart line -- e.g. a ₱120 Americano with "Large"
-// (+30) and "Velvet Creme" (+20) becomes ₱170 for that specific order line,
-// while a Small/no-toppings Americano in the same cart stays ₱120.
+// Shared by every drink product: a size, plus two add-ons (sugar level and extra
+// espresso shots). priceDelta is added on top of the product's base price for that
+// one order line -- e.g. a ₱120 Americano in Large (+30) with 1 extra shot (+30)
+// comes to ₱180. The promo discounts (40% / 100%) aren't defined here; they live
+// in constants/pricing.ts.
 const DRINK_SPECS: ProductSpecGroup[] = [
   {
     key: "size",
     label: "Size:",
+    section: "Size",
     options: [
       { label: "Small", priceDelta: 0 },
       { label: "Medium", priceDelta: 15 },
@@ -70,59 +74,26 @@ const DRINK_SPECS: ProductSpecGroup[] = [
     ],
   },
   {
-    key: "temperature",
-    label: "Temperature:",
-    options: [
-      { label: "Cold", priceDelta: 0 },
-      { label: "Hot", priceDelta: 0 },
-    ],
-  },
-  {
-    key: "sugarType",
-    label: "Sugar Type:",
-    options: [
-      { label: "None", priceDelta: 0 },
-      { label: "White Sugar", priceDelta: 0 },
-      { label: "Cane", priceDelta: 0 },
-      { label: "Muscovado", priceDelta: 5 },
-    ],
-  },
-  {
     key: "sugarLevel",
     label: "Sugar Level:",
+    section: "Add-ons",
+    defaultLabel: "50%",
     options: [
-      { label: "0", priceDelta: 0 },
-      { label: "25", priceDelta: 0 },
-      { label: "50", priceDelta: 0 },
-      { label: "75", priceDelta: 0 },
-      { label: "100", priceDelta: 0 },
+      { label: "0%", priceDelta: 0 },
+      { label: "25%", priceDelta: 0 },
+      { label: "50%", priceDelta: 0 },
+      { label: "75%", priceDelta: 0 },
+      { label: "100%", priceDelta: 0 },
     ],
   },
   {
-    key: "toppings",
-    label: "Toppings:",
+    key: "extraShot",
+    label: "Extra Espresso Shot:",
+    section: "Add-ons",
     options: [
       { label: "None", priceDelta: 0 },
-      { label: "Velvet Creme", priceDelta: 20 },
-      { label: "Jelly Strips", priceDelta: 15 },
-      { label: "Coffee Jelly", priceDelta: 15 },
-    ],
-  },
-  {
-    key: "syrup",
-    label: "Syrup:",
-    options: [
-      { label: "None", priceDelta: 0 },
-      { label: "Salted Caramel", priceDelta: 10 },
-      { label: "French Vanilla", priceDelta: 10 },
-    ],
-  },
-  {
-    key: "whippedCream",
-    label: "Whipped Cream:",
-    options: [
-      { label: "Yes", priceDelta: 15 },
-      { label: "No", priceDelta: 0 },
+      { label: "1 Shot", priceDelta: 30 },
+      { label: "2 Shots", priceDelta: 60 },
     ],
   },
 ];

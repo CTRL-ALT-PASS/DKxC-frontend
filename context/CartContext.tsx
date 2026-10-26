@@ -1,4 +1,5 @@
-import { getUnitPrice, type Product } from "@/constants/mockData";
+import type { Product } from "@/constants/mockData";
+import { useAuth } from "@/context/AuthContext";
 import { recordTransaction } from "@/services/transactionsApi";
 import {
   createContext,
@@ -7,12 +8,14 @@ import {
   useContext,
   useReducer,
 } from "react";
+import { getLineTotal, getOrderTotals } from "../constants/pricing";
 
 export interface CartItem {
   key: string;
   product: Product;
   quantity: number;
   options?: Record<string, string>;
+  discountPercent?: number; // promo (e.g. 40 or 100) -- covers ONE drink of this line only
 }
 
 export type OrderType = "Dine In" | "Take out";
@@ -20,7 +23,11 @@ export type PaymentMode = "Cash" | "Cashless";
 
 export interface Transaction {
   id: string;
+  employeeId: string; // the cashier who processed it -- order history only shows a cashier their own orders
+  cashierName: string;
   items: CartItem[];
+  subtotal: number; // before the PWD / Senior discount
+  seniorPwdDiscount: number; // pesos taken off by that discount (0 when it wasn't applied)
   total: number;
   orderType: OrderType;
   paymentMode: PaymentMode;
@@ -30,11 +37,19 @@ export interface Transaction {
 interface CartState {
   items: Record<string, CartItem>;
   orderType: OrderType;
+  seniorPwd: boolean;
   transactions: Transaction[];
 }
 
 type CartAction =
   | { type: "ADD"; product: Product; options?: Record<string, string> }
+  | {
+      type: "ADD_CUSTOMIZED";
+      product: Product;
+      options: Record<string, string>;
+      quantity: number;
+      discountPercent?: number;
+    }
   | { type: "INCREMENT_KEY"; key: string }
   | { type: "DECREASE"; key: string }
   | { type: "REMOVE_KEY"; key: string }
@@ -47,6 +62,7 @@ type CartAction =
       newOptions: Record<string, string>;
     }
   | { type: "SET_ORDER_TYPE"; orderType: OrderType }
+  | { type: "SET_SENIOR_PWD"; enabled: boolean }
   | { type: "COMPLETE_TRANSACTION"; transaction: Transaction };
 
 // Simple (non-customized) products get a key equal to their plain id, so
@@ -90,6 +106,35 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         },
       };
     }
+    case "ADD_CUSTOMIZED": {
+      // One confirm from the options modal. With a promo, the promo'd drink gets
+      // its own line (quantity 1) and the remaining drinks share a plain line, so
+      // the discount can only ever land on a single drink.
+      const count = Math.max(1, Math.floor(action.quantity));
+      const base = makeCartKey(action.product.id, action.options);
+      const items = { ...state.items };
+      const plainCount = action.discountPercent ? count - 1 : count;
+      if (action.discountPercent) {
+        const key = `${base}::${uniqueSuffix()}-promo`;
+        items[key] = {
+          key,
+          product: action.product,
+          quantity: 1,
+          options: action.options,
+          discountPercent: action.discountPercent,
+        };
+      }
+      if (plainCount > 0) {
+        const key = `${base}::${uniqueSuffix()}`;
+        items[key] = {
+          key,
+          product: action.product,
+          quantity: plainCount,
+          options: action.options,
+        };
+      }
+      return { ...state, items };
+    }
     case "INCREMENT_KEY": {
       const existing = state.items[action.key];
       if (!existing) return state;
@@ -124,7 +169,8 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const { [action.oldKey]: _removed, ...rest } = state.items;
       const newKey = makeCartKey(action.product.id, action.newOptions);
       const existingAtNewKey = rest[newKey];
-      const mergedQuantity = (existingAtNewKey?.quantity || 0) + action.quantity;
+      const mergedQuantity =
+        (existingAtNewKey?.quantity || 0) + action.quantity;
       return {
         ...state,
         items: {
@@ -134,19 +180,23 @@ function cartReducer(state: CartState, action: CartAction): CartState {
             product: action.product,
             quantity: mergedQuantity,
             options: action.newOptions,
+            discountPercent: state.items[action.oldKey]?.discountPercent,
           },
         },
       };
     }
     case "SET_ORDER_TYPE":
       return { ...state, orderType: action.orderType };
+    case "SET_SENIOR_PWD":
+      return { ...state, seniorPwd: action.enabled };
     case "CLEAR":
-      return { ...state, items: {}, orderType: "Dine In" };
+      return { ...state, items: {}, orderType: "Dine In", seniorPwd: false };
     case "COMPLETE_TRANSACTION":
       return {
         ...state,
         items: {},
         orderType: "Dine In",
+        seniorPwd: false,
         transactions: [action.transaction, ...state.transactions],
       };
     default:
@@ -154,12 +204,26 @@ function cartReducer(state: CartState, action: CartAction): CartState {
   }
 }
 
+// Only the orders this employee processed. The order history screen uses this so
+// one cashier never sees another cashier's orders.
+export function getTransactionsForEmployee(
+  transactions: Transaction[],
+  employeeId?: string,
+) {
+  if (!employeeId) return [];
+  return transactions.filter((t) => t.employeeId === employeeId);
+}
+
 interface CartContextValue {
   items: Record<string, CartItem>;
   list: CartItem[];
-  total: number;
+  subtotal: number; // sum of the lines, before the PWD / Senior discount
+  seniorPwdDiscount: number; // pesos off from that discount (0 when it's off)
+  isSeniorPwd: boolean;
+  total: number; // what the customer pays
   orderType: OrderType;
-  transactions: Transaction[];
+  transactions: Transaction[]; // everything processed on this device
+  myTransactions: Transaction[]; // only the logged-in cashier's orders
   dispatch: Dispatch<CartAction>;
   completeTransaction: (paymentMode: PaymentMode) => void;
 }
@@ -170,12 +234,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, {
     items: {},
     orderType: "Dine In",
+    seniorPwd: false,
     transactions: [],
   });
+  const { user } = useAuth();
   const list = Object.values(state.items);
-  const total = list.reduce(
-    (sum, i) => sum + getUnitPrice(i.product, i.options) * i.quantity,
-    0,
+  const { subtotal, seniorPwdDiscount, total } = getOrderTotals(
+    list.reduce(
+      (sum, i) =>
+        sum + getLineTotal(i.product, i.options, i.quantity, i.discountPercent),
+      0,
+    ),
+    state.seniorPwd,
+  );
+  const myTransactions = getTransactionsForEmployee(
+    state.transactions,
+    user?.employee_id,
   );
 
   // The one seam where a real backend plugs in. The cart updates immediately
@@ -184,10 +258,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // against mock data. Reducers can't await, which is why the transaction is
   // built here and handed to the reducer ready-made.
   const completeTransaction = (paymentMode: PaymentMode) => {
-    if (list.length === 0) return;
+    if (list.length === 0 || !user) return;
     const transaction: Transaction = {
       id: uniqueSuffix(),
+      employeeId: user.employee_id,
+      cashierName: user.fullname,
       items: list,
+      subtotal,
+      seniorPwdDiscount,
       total,
       orderType: state.orderType,
       paymentMode,
@@ -206,9 +284,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       value={{
         items: state.items,
         list,
+        subtotal,
+        seniorPwdDiscount,
+        isSeniorPwd: state.seniorPwd,
         total,
         orderType: state.orderType,
         transactions: state.transactions,
+        myTransactions,
         dispatch,
         completeTransaction,
       }}
