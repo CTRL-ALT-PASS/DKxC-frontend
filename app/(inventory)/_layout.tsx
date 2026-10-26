@@ -14,7 +14,7 @@ import { useAuth } from "../../context/AuthContext";
 
 const NAV = [
   { key: "dashboard", icon: Activity, title: "Dashboard" },
-  { key: "sales", icon: ClipboardList, title: "Sales" },
+  { key: "sales", icon: ClipboardList, title: "Transactions" },
   {
     key: "products",
     icon: ShoppingBag,
@@ -47,6 +47,7 @@ export default function TabsLayout() {
   const navItems = NAV.map((item) => ({
     key: item.key,
     icon: item.icon,
+    label: item.title,
     isActive: matchesSection(item, pathname),
     onPress: () => router.navigate(`/(inventory)/${item.key}` as any),
   }));
@@ -63,7 +64,7 @@ export default function TabsLayout() {
 
   return (
     <View className="flex-1 flex-row">
-      <Sidebar navItems={navItems} onLogout={handleLogout} logo={darcyMark} />
+      <Sidebar navItems={navItems} onLogout={handleLogout} logo={darcyMark} defaultCollapsed/>
       <View className="flex-1">
         <Header title={activeTitle} date={today} />
         <Slot />
