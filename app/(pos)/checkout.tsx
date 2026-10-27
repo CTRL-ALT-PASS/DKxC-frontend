@@ -22,7 +22,7 @@ export default function TransactionHistoryScreen() {
   if (!user) return null;
 
   return (
-    <View className="flex-1 bg-cream">
+    <View className="flex-1 bg-neutral">
       <Header
         title="Order History"
         date={today}
@@ -40,7 +40,7 @@ export default function TransactionHistoryScreen() {
         {myTransactions.map((tx) => (
           <View key={tx.id} className="bg-white rounded-2xl p-5 mb-4 max-w-xl">
             <View className="flex-row justify-between items-center mb-3">
-              <Text className="font-semibold text-darcy">
+              <Text className="font-semibold text-secondary">
                 {new Date(tx.completedAt).toLocaleString("en-US", {
                   month: "short",
                   day: "numeric",
@@ -49,10 +49,10 @@ export default function TransactionHistoryScreen() {
                 })}
               </Text>
               <View className="flex-row gap-2">
-                <View className="bg-cream px-2 py-1 rounded-md">
+                <View className="bg-neutral px-2 py-1 rounded-md">
                   <Text className="text-xs text-slate-600">{tx.orderType}</Text>
                 </View>
-                <View className="bg-cream px-2 py-1 rounded-md">
+                <View className="bg-neutral px-2 py-1 rounded-md">
                   <Text className="text-xs text-slate-600">
                     {tx.paymentMode}
                   </Text>
@@ -72,7 +72,7 @@ export default function TransactionHistoryScreen() {
                     </Text>
                   )}
                   {!!entry.discountPercent && (
-                    <Text className="text-xs text-darcy font-medium">
+                    <Text className="text-xs text-primary font-medium">
                       {formatPromo(
                         entry.product,
                         entry.options,
@@ -103,10 +103,10 @@ export default function TransactionHistoryScreen() {
                     </Text>
                   </View>
                   <View className="flex-row justify-between mb-2">
-                    <Text className="text-sm text-darcy font-medium">
+                    <Text className="text-sm text-primary font-medium">
                       PWD / Senior ({SENIOR_PWD_DISCOUNT_PERCENT}%)
                     </Text>
-                    <Text className="text-sm text-darcy font-medium">
+                    <Text className="text-sm text-primary font-medium">
                       −₱{tx.seniorPwdDiscount.toFixed(2)}
                     </Text>
                   </View>

@@ -34,10 +34,24 @@ export interface Transaction {
   completedAt: string;
 }
 
+export interface PendingOrder {
+  id: string;
+  employeeId: string;
+  cashierName: string;
+  items: CartItem[];
+  subtotal: number;
+  seniorPwdDiscount: number;
+  seniorPwd: boolean;
+  total: number;
+  orderType: OrderType;
+  createdAt: string;
+}
+
 interface CartState {
   items: Record<string, CartItem>;
   orderType: OrderType;
   seniorPwd: boolean;
+  pendingOrders: PendingOrder[];
   transactions: Transaction[];
 }
 
@@ -63,7 +77,27 @@ type CartAction =
     }
   | { type: "SET_ORDER_TYPE"; orderType: OrderType }
   | { type: "SET_SENIOR_PWD"; enabled: boolean }
-  | { type: "COMPLETE_TRANSACTION"; transaction: Transaction };
+  | { type: "PLACE_ORDER"; order: PendingOrder }
+  | {
+      type: "CHANGE_PENDING_ITEM_QUANTITY";
+      orderId: string;
+      key: string;
+      delta: number;
+    }
+  | { type: "REMOVE_PENDING_ITEM"; orderId: string; key: string }
+  | {
+      type: "EDIT_PENDING_ITEM";
+      orderId: string;
+      key: string;
+      options: Record<string, string>;
+      quantity: number;
+      discountPercent?: number;
+    }
+  | {
+      type: "COMPLETE_PENDING_ORDER";
+      orderId: string;
+      transaction: Transaction;
+    };
 
 // Simple (non-customized) products get a key equal to their plain id, so
 // repeated taps merge into one line with a growing quantity. Customized
@@ -83,6 +117,34 @@ export function makeCartKey(
 
 function uniqueSuffix() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function recalculatePendingOrder(order: PendingOrder): PendingOrder {
+  const subtotal = order.items.reduce(
+    (sum, item) =>
+      sum +
+      getLineTotal(
+        item.product,
+        item.options,
+        item.quantity,
+        item.discountPercent,
+      ),
+    0,
+  );
+  return { ...order, ...getOrderTotals(subtotal, order.seniorPwd) };
+}
+
+function updatePendingOrder(
+  state: CartState,
+  orderId: string,
+  update: (order: PendingOrder) => PendingOrder,
+): CartState {
+  return {
+    ...state,
+    pendingOrders: state.pendingOrders.map((order) =>
+      order.id === orderId ? recalculatePendingOrder(update(order)) : order,
+    ),
+  };
 }
 
 function cartReducer(state: CartState, action: CartAction): CartState {
@@ -191,12 +253,55 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return { ...state, seniorPwd: action.enabled };
     case "CLEAR":
       return { ...state, items: {}, orderType: "Dine In", seniorPwd: false };
-    case "COMPLETE_TRANSACTION":
+    case "PLACE_ORDER":
       return {
         ...state,
         items: {},
         orderType: "Dine In",
         seniorPwd: false,
+        pendingOrders: [action.order, ...state.pendingOrders],
+      };
+    case "CHANGE_PENDING_ITEM_QUANTITY":
+      return updatePendingOrder(state, action.orderId, (order) => ({
+        ...order,
+        items: order.items.map((item) =>
+          item.key === action.key
+            ? { ...item, quantity: Math.max(1, item.quantity + action.delta) }
+            : item,
+        ),
+      }));
+    case "REMOVE_PENDING_ITEM": {
+      const updatedState = updatePendingOrder(state, action.orderId, (order) => ({
+        ...order,
+        items: order.items.filter((item) => item.key !== action.key),
+      }));
+      return {
+        ...updatedState,
+        pendingOrders: updatedState.pendingOrders.filter(
+          (order) => order.items.length > 0,
+        ),
+      };
+    }
+    case "EDIT_PENDING_ITEM":
+      return updatePendingOrder(state, action.orderId, (order) => ({
+        ...order,
+        items: order.items.map((item) =>
+          item.key === action.key
+            ? {
+                ...item,
+                options: action.options,
+                quantity: Math.max(1, Math.floor(action.quantity)),
+                discountPercent: action.discountPercent,
+              }
+            : item,
+        ),
+      }));
+    case "COMPLETE_PENDING_ORDER":
+      return {
+        ...state,
+        pendingOrders: state.pendingOrders.filter(
+          (order) => order.id !== action.orderId,
+        ),
         transactions: [action.transaction, ...state.transactions],
       };
     default:
@@ -224,8 +329,10 @@ interface CartContextValue {
   orderType: OrderType;
   transactions: Transaction[]; // everything processed on this device
   myTransactions: Transaction[]; // only the logged-in cashier's orders
+  pendingOrders: PendingOrder[];
   dispatch: Dispatch<CartAction>;
-  completeTransaction: (paymentMode: PaymentMode) => void;
+  placeOrder: () => void;
+  completePendingOrder: (orderId: string, paymentMode: PaymentMode) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -235,6 +342,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     items: {},
     orderType: "Dine In",
     seniorPwd: false,
+    pendingOrders: [],
     transactions: [],
   });
   const { user } = useAuth();
@@ -252,26 +360,40 @@ export function CartProvider({ children }: { children: ReactNode }) {
     user?.employee_id,
   );
 
-  // The one seam where a real backend plugs in. The cart updates immediately
-  // (the UI never waits on a network round trip), and recordTransaction() is
-  // where "save this sale to the server" lives -- right now it just resolves
-  // against mock data. Reducers can't await, which is why the transaction is
-  // built here and handed to the reducer ready-made.
-  const completeTransaction = (paymentMode: PaymentMode) => {
+  const placeOrder = () => {
     if (list.length === 0 || !user) return;
-    const transaction: Transaction = {
+    const order: PendingOrder = {
       id: uniqueSuffix(),
       employeeId: user.employee_id,
       cashierName: user.fullname,
-      items: list,
+      items: list.map((item) => ({ ...item })),
       subtotal,
       seniorPwdDiscount,
+      seniorPwd: state.seniorPwd,
       total,
       orderType: state.orderType,
+      createdAt: new Date().toISOString(),
+    };
+    dispatch({ type: "PLACE_ORDER", order });
+  };
+
+  const completePendingOrder = (orderId: string, paymentMode: PaymentMode) => {
+    const order = state.pendingOrders.find((pending) => pending.id === orderId);
+    if (!order || order.items.length === 0 || !user) return;
+
+    const transaction: Transaction = {
+      id: order.id,
+      employeeId: user.employee_id,
+      cashierName: user.fullname,
+      items: order.items,
+      subtotal: order.subtotal,
+      seniorPwdDiscount: order.seniorPwdDiscount,
+      total: order.total,
+      orderType: order.orderType,
       paymentMode,
       completedAt: new Date().toISOString(),
     };
-    dispatch({ type: "COMPLETE_TRANSACTION", transaction });
+    dispatch({ type: "COMPLETE_PENDING_ORDER", orderId, transaction });
     recordTransaction(transaction).catch((err) => {
       // Never fails with mock data. With a real backend, this is where you'd
       // queue a retry or show a "couldn't sync" message.
@@ -291,8 +413,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         orderType: state.orderType,
         transactions: state.transactions,
         myTransactions,
+        pendingOrders: state.pendingOrders,
         dispatch,
-        completeTransaction,
+        placeOrder,
+        completePendingOrder,
       }}
     >
       {children}

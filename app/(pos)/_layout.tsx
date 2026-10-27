@@ -22,18 +22,21 @@ export default function TabsLayout() {
   const navItems = [
     {
       key: "order",
+      label: "Order",
       icon: LayoutGrid,
       isActive: pathname === "/menu",
       onPress: () => router.navigate("/menu"),
     },
     {
       key: "pending",
+      label: "Pending",
       icon: Clock,
       isActive: pathname === "/pending",
       onPress: () => router.navigate("/pending"),
     },
     {
       key: "history",
+      label: "History",
       icon: History,
       isActive: pathname === "/checkout",
       onPress: () => router.navigate("/checkout"),
