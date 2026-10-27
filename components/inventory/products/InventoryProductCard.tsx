@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { Eye, EyeOff } from "lucide-react-native";
+import { Eye, EyeOff, ImageIcon } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import type { Product } from "../../../constants/mockData";
 import MarqueeBadge from "./MarqueeBadge";
@@ -20,16 +20,23 @@ export default function InventoryProductCard({
       onPress={onPress}
       className="bg-white rounded-2xl p-3 w-40 border border-slate-200"
     >
-      <Image
-        source={product.image}
-        style={{
-          width: "100%",
-          height: 124,
-          borderRadius: 12,
-          marginBottom: 8,
-        }}
-        contentFit="cover"
-      />
+      {product.image ? (
+        <Image
+          source={product.image}
+          style={{
+            width: "100%",
+            height: 124,
+            borderRadius: 12,
+            marginBottom: 8,
+          }}
+          contentFit="cover"
+        />
+      ) : (
+        <View className="w-full h-32 items-center justify-center bg-slate-100">
+          <ImageIcon size={28} color="#94a3b8" />
+        </View>
+      )}
+
       <Text className="font-semibold text-slate-800">{product.name}</Text>
 
       <View className="flex-row items-center justify-between mt-2">

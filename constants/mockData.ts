@@ -25,7 +25,7 @@ export interface Product {
   name: string;
   price: number;
   category: string;
-  image: ImageSourcePropType;
+  image?: ImageSourcePropType;
   specs?: ProductSpecGroup[];
   available?: boolean; // Indicates if the product is currently available for sale
 }

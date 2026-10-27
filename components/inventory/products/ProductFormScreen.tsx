@@ -1,30 +1,14 @@
 // ProductFormScreen.tsx
-// Create / Edit Product screen for the POS + Inventory app (Expo + React Native + NativeWind v4).
-// Restyled to match the Stitch design: card sections, rose/maroon theme, linked-deduction chips.
+// Create / Edit Product screen (Expo + React Native + NativeWind v4).
 //
-// Only the page body + sticky footer live here. The sidebar, top bar and breadcrumb belong to
-// your app layout, so this screen renders a plain <View className="flex-1"> (no SafeAreaView).
-//
-// Packages:
-//   npx expo install expo-image-picker
-//   (@expo/vector-icons is bundled with Expo)
-//
-// Colors use Tailwind's built-in `rose` palette (rose-700 accent, rose-950 ≈ your sidebar maroon),
-// so no tailwind.config changes are needed.
-//
-// Usage with expo-router, e.g. app/products/new.tsx:
-//   <ProductFormScreen
-//     categoryOptions={...}
-//     ingredientOptions={...}   // [{ id, label, unit: "g" }, ...]
-//     onCancel={() => router.back()}
-//     onSave={async (values) => { await api.createProduct(values); router.back(); }}
-//   />
+// Add-ons are NOT created here. Which add-ons a category offers is managed in the add-on
+// management flow; this screen only lets you switch off add-ons for this one product.
 
+import { notify } from "@/utils/dialogs";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRef, useState } from "react";
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   LayoutAnimation,
@@ -36,7 +20,7 @@ import {
   Text,
   TextInput,
   UIManager,
-  View,
+  View
 } from "react-native";
 
 // Old architecture needs this flag for LayoutAnimation on Android (no-op on new arch).
@@ -49,34 +33,43 @@ if (
 
 /* ----------------------------- Types ----------------------------- */
 
-// `unit` is optional: ingredient options can carry their unit of measurement (e.g. "g", "ml").
-// When an ingredient is picked, its unit is copied into the row; otherwise it stays "u".
+// `unit` is the ingredient's base unit (g, mL, pcs...). Recipe quantities are always in it.
 export type Option = { id: string; label: string; unit?: string };
+
+export type AddOnOption = {
+  id: number;
+  name: string;
+  price: string;
+  categoryIds: number[]; // categories that offer this add-on
+};
+
+export type ProductStatus = "Active" | "Inactive" | "Discontinued";
 
 export type IngredientLine = {
   id: string; // local row id
   ingredientId: string | null;
   qty: string;
-  unit: string;
 };
 
-export type Variant = {
-  id: string;
+export type SizeRow = {
+  id: string; // local row id
+  sizeId?: number; // set for sizes that already exist (must be sent back on PATCH)
   name: string;
   extraCost: string;
-  ingredients: IngredientLine[]; // "linked deductions"
+  ingredients: IngredientLine[];
 };
 
 export type ProductFormValues = {
-  imageUri: string | null;
   name: string;
+  imageUri: string | null;
+  description: string;
   categoryId: string | null;
   price: string;
+  status: ProductStatus;
   ingredients: IngredientLine[];
   sizesEnabled: boolean;
-  sizes: Variant[];
-  addOnsEnabled: boolean;
-  addOns: Variant[];
+  sizes: SizeRow[];
+  disabledAddOnIds: number[];
 };
 
 type Props = {
@@ -84,28 +77,31 @@ type Props = {
   initialValues?: Partial<ProductFormValues>;
   categoryOptions: Option[];
   ingredientOptions: Option[];
-  syncActive?: boolean; // shows the green "Inventory Sync Active" pill
+  addOns: AddOnOption[]; // every add-on; the form filters by the selected category
   onSave: (values: ProductFormValues) => void | Promise<void>;
+  onDelete?: () => void | Promise<void>;
   onCancel: () => void;
 };
 
 /* ----------------------------- Helpers ----------------------------- */
 
-const DEFAULT_UNIT = "u";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
 const ROSE = "#be123c"; // rose-700
-const ROSE_SOFT = "#fda4af"; // rose-300
 const MUTED = "#a3a3a3"; // neutral-400
 
-const uid = () => Math.random().toString(36).slice(2, 10);
+const STATUS_OPTIONS: Option[] = [
+  { id: "Active", label: "Active" },
+  { id: "Inactive", label: "Inactive" },
+  { id: "Discontinued", label: "Discontinued" },
+];
+
+export const uid = () => Math.random().toString(36).slice(2, 10);
 const newLine = (): IngredientLine => ({
   id: uid(),
   ingredientId: null,
   qty: "",
-  unit: DEFAULT_UNIT,
 });
-const newVariant = (): Variant => ({
+const newSize = (): SizeRow => ({
   id: uid(),
   name: "",
   extraCost: "",
@@ -115,10 +111,13 @@ const decimalOnly = (t: string) => t.replace(/[^0-9.]/g, "");
 const animate = () =>
   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-// Drop half-filled ingredient rows before saving.
+const unitFor = (options: Option[], ingredientId: string | null) =>
+  options.find((o) => o.id === ingredientId)?.unit ?? "—";
+
+// Drop half-filled (or zero-quantity) ingredient rows before validating/saving.
 const cleanLines = (lines: IngredientLine[]) =>
-  lines.filter((l) => l.ingredientId && l.qty.length > 0);
-const cleanVariants = (rows: Variant[]) =>
+  lines.filter((l) => l.ingredientId && Number(l.qty) > 0);
+const cleanSizes = (rows: SizeRow[]) =>
   rows
     .filter((r) => r.name.trim().length > 0)
     .map((r) => ({
@@ -127,22 +126,14 @@ const cleanVariants = (rows: Variant[]) =>
       ingredients: cleanLines(r.ingredients),
     }));
 
+const hasDuplicateIngredient = (lines: IngredientLine[]) =>
+  new Set(lines.map((l) => l.ingredientId)).size !== lines.length;
+
 const patchLine = (
   lines: IngredientLine[],
   id: string,
   patch: Partial<IngredientLine>,
 ) => lines.map((l) => (l.id === id ? { ...l, ...patch } : l));
-
-const pickIngredient = (
-  lines: IngredientLine[],
-  lineId: string,
-  ingredientId: string,
-  options: Option[],
-) =>
-  patchLine(lines, lineId, {
-    ingredientId,
-    unit: options.find((o) => o.id === ingredientId)?.unit ?? DEFAULT_UNIT,
-  });
 
 // "Regular 12oz (Hot/Cold)" -> "12oz"; otherwise first 3 letters.
 const sizeBadge = (name: string, index: number) => {
@@ -150,7 +141,8 @@ const sizeBadge = (name: string, index: number) => {
   if (m) return m[0].replace(/\s/g, "").toLowerCase();
   return name.trim().slice(0, 3).toUpperCase() || `#${index + 1}`;
 };
-const addOnBadge = () => "+";
+
+const formatPeso = (v: string) => `₱${Number(v).toFixed(2)}`;
 
 /* ----------------------------- Small UI pieces ----------------------------- */
 
@@ -363,16 +355,18 @@ function PesoInput({
   );
 }
 
-/* ----------------------------- Base recipe rows (Basic Information card) ----------------------------- */
+/* ----------------------------- Base recipe rows ----------------------------- */
 
 function BaseRecipe({
   lines,
   ingredientOptions,
   onChange,
+  error,
 }: {
   lines: IngredientLine[];
   ingredientOptions: Option[];
   onChange: (lines: IngredientLine[]) => void;
+  error?: string;
 }) {
   return (
     <View>
@@ -392,7 +386,9 @@ function BaseRecipe({
         />
       </View>
 
-      <View className="gap-2 rounded-xl border border-rose-100 bg-rose-50/60 p-3">
+      <View
+        className={`gap-2 rounded-xl border bg-rose-50/60 p-3 ${error ? "border-rose-400" : "border-rose-100"}`}
+      >
         {lines.length === 0 && (
           <Text className="py-2 text-center text-xs text-neutral-400">
             No ingredients yet. Tap “Add Ingredient”.
@@ -406,9 +402,7 @@ function BaseRecipe({
                 options={ingredientOptions}
                 placeholder="Select ingredient"
                 onChange={(id) =>
-                  onChange(
-                    pickIngredient(lines, line.id, id, ingredientOptions),
-                  )
+                  onChange(patchLine(lines, line.id, { ingredientId: id }))
                 }
               />
             </View>
@@ -424,7 +418,7 @@ function BaseRecipe({
             />
             <View className="h-11 w-20 items-center justify-center rounded-lg bg-rose-100">
               <Text className="text-xs font-semibold text-rose-800">
-                {line.unit}
+                {unitFor(ingredientOptions, line.ingredientId)}
               </Text>
             </View>
             <IconButton
@@ -437,11 +431,12 @@ function BaseRecipe({
           </View>
         ))}
       </View>
+      <ErrorText text={error} />
     </View>
   );
 }
 
-/* ----------------------------- Linked deduction chips (inside a variant) ----------------------------- */
+/* ----------------------------- Linked deduction chips (inside a size) ----------------------------- */
 
 function DeductionChip({
   line,
@@ -463,14 +458,7 @@ function DeductionChip({
           value={line.ingredientId}
           options={ingredientOptions}
           placeholder="Select item"
-          onChange={(id) =>
-            onChange({
-              ingredientId: id,
-              unit:
-                ingredientOptions.find((o) => o.id === id)?.unit ??
-                DEFAULT_UNIT,
-            })
-          }
+          onChange={(id) => onChange({ ingredientId: id })}
         />
       </View>
       <TextInput
@@ -481,7 +469,9 @@ function DeductionChip({
         placeholderTextColor={MUTED}
         className="h-7 w-12 rounded bg-rose-50 px-1 text-center text-xs font-semibold text-neutral-900 focus:bg-rose-100"
       />
-      <Text className="w-7 text-xs text-neutral-500">{line.unit}</Text>
+      <Text className="w-7 text-xs text-neutral-500">
+        {unitFor(ingredientOptions, line.ingredientId)}
+      </Text>
       <Pressable onPress={onRemove} hitSlop={8}>
         <Ionicons name="close" size={16} color={MUTED} />
       </Pressable>
@@ -489,27 +479,19 @@ function DeductionChip({
   );
 }
 
-/* ----------------------------- Variant card (Sizes / Add-ons) ----------------------------- */
+/* ----------------------------- Size card ----------------------------- */
 
-function VariantCard({
+function SizeCard({
   row,
-  index,
-  nameLabel,
-  namePlaceholder,
-  costLabel,
   badge,
   ingredientOptions,
   onChange,
   onRemove,
 }: {
-  row: Variant;
-  index: number;
-  nameLabel: string;
-  namePlaceholder: string;
-  costLabel: string;
+  row: SizeRow;
   badge: string;
   ingredientOptions: Option[];
-  onChange: (patch: Partial<Variant>) => void;
+  onChange: (patch: Partial<SizeRow>) => void;
   onRemove: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
@@ -522,18 +504,19 @@ function VariantCard({
         </View>
 
         <View className="flex-1">
-          <Label text={nameLabel} />
+          <Label text="Size name" />
           <TextInput
             value={row.name}
             onChangeText={(name) => onChange({ name })}
-            placeholder={namePlaceholder}
+            placeholder="e.g. Iced 16oz"
             placeholderTextColor={MUTED}
+            maxLength={30}
             className="h-11 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 focus:border-rose-500"
           />
         </View>
 
         <View className="w-48">
-          <Label text={costLabel} />
+          <Label text="Additional cost (+₱)" />
           <PesoInput
             prefix="+₱"
             value={row.extraCost}
@@ -571,7 +554,7 @@ function VariantCard({
               <Text className="text-xs font-medium text-neutral-600">
                 Linked Deductions for{" "}
                 <Text className="font-semibold text-neutral-800">
-                  {row.name.trim() || "this item"}
+                  {row.name.trim() || "this size"}
                 </Text>
                 :
               </Text>
@@ -620,43 +603,29 @@ function VariantCard({
   );
 }
 
-/* ----------------------------- Toggleable variant section card ----------------------------- */
+/* ----------------------------- Sizes section ----------------------------- */
 
-function VariantSection({
-  icon,
-  title,
-  subtitle,
+function SizesSection({
   enabled,
   onToggle,
   rows,
   onChange,
   ingredientOptions,
-  nameLabel,
-  namePlaceholder,
-  costLabel,
-  addLabel,
-  badgeFor,
+  error,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
   enabled: boolean;
   onToggle: (v: boolean) => void;
-  rows: Variant[];
-  onChange: (rows: Variant[]) => void;
+  rows: SizeRow[];
+  onChange: (rows: SizeRow[]) => void;
   ingredientOptions: Option[];
-  nameLabel: string;
-  namePlaceholder: string;
-  costLabel: string;
-  addLabel: string;
-  badgeFor: (name: string, index: number) => string;
+  error?: string;
 }) {
   return (
     <Card>
       <CardHeader
-        icon={icon}
-        title={title}
-        subtitle={subtitle}
+        icon="resize-outline"
+        title="Sizes & Portions"
+        subtitle="Serving sizes, additional price charges, and the extra inventory each size deducts. One size must cost +₱0 (the base size)."
         right={
           <View className="flex-row items-center gap-2">
             <Text className="text-xs text-neutral-500">
@@ -679,14 +648,10 @@ function VariantSection({
       {enabled && (
         <View className="mt-5 gap-3">
           {rows.map((row, i) => (
-            <VariantCard
+            <SizeCard
               key={row.id}
               row={row}
-              index={i}
-              nameLabel={nameLabel}
-              namePlaceholder={namePlaceholder}
-              costLabel={costLabel}
-              badge={badgeFor(row.name, i)}
+              badge={sizeBadge(row.name, i)}
               ingredientOptions={ingredientOptions}
               onChange={(patch) =>
                 onChange(
@@ -703,15 +668,83 @@ function VariantSection({
           <Pressable
             onPress={() => {
               animate();
-              onChange([...rows, newVariant()]);
+              onChange([...rows, newSize()]);
             }}
             className="h-11 flex-row items-center justify-center gap-2 rounded-xl border border-dashed border-rose-300 active:bg-rose-50"
           >
             <Ionicons name="add" size={18} color={ROSE} />
             <Text className="text-sm font-semibold text-rose-700">
-              {addLabel}
+              Add Size
             </Text>
           </Pressable>
+          <ErrorText text={error} />
+        </View>
+      )}
+    </Card>
+  );
+}
+
+/* ----------------------------- Add-ons section (switch off per product) ----------------------------- */
+
+function AddOnsSection({
+  categoryChosen,
+  offered,
+  disabledIds,
+  onToggle,
+}: {
+  categoryChosen: boolean;
+  offered: AddOnOption[];
+  disabledIds: number[];
+  onToggle: (id: number, enabled: boolean) => void;
+}) {
+  return (
+    <Card>
+      <CardHeader
+        icon="add-circle-outline"
+        title="Add-ons"
+        subtitle="Offered by this product's category. Turn one off if it doesn't apply to this product. To change what a category offers, use Manage add-ons."
+        divider
+      />
+
+      {!categoryChosen ? (
+        <Text className="text-xs text-neutral-400">
+          Select a category to see its add-ons.
+        </Text>
+      ) : offered.length === 0 ? (
+        <Text className="text-xs text-neutral-400">
+          This category doesn't offer any add-ons.
+        </Text>
+      ) : (
+        <View className="gap-2">
+          {offered.map((a) => {
+            const enabled = !disabledIds.includes(a.id);
+            return (
+              <View
+                key={a.id}
+                className="flex-row items-center gap-3 rounded-xl border border-rose-100 bg-rose-50/40 px-4 py-3"
+              >
+                <View className="flex-1">
+                  <Text
+                    className={`text-sm font-medium ${enabled ? "text-neutral-900" : "text-neutral-400"}`}
+                  >
+                    {a.name}
+                  </Text>
+                  <Text className="text-xs text-neutral-500">
+                    +{formatPeso(a.price)}
+                  </Text>
+                </View>
+                <Text className="text-xs text-neutral-500">
+                  {enabled ? "Offered" : "Off for this product"}
+                </Text>
+                <Switch
+                  value={enabled}
+                  onValueChange={(v) => onToggle(a.id, v)}
+                  trackColor={{ false: "#d4d4d4", true: ROSE }}
+                  thumbColor="#fff"
+                />
+              </View>
+            );
+          })}
         </View>
       )}
     </Card>
@@ -725,42 +758,85 @@ export default function ProductFormScreen({
   initialValues,
   categoryOptions,
   ingredientOptions,
-  syncActive = true,
+  addOns,
   onSave,
+  onDelete,
   onCancel,
 }: Props) {
+  const [imageUri, setImageUri] = useState(initialValues?.imageUri ?? null);
+
   const scrollRef = useRef<ScrollView>(null);
 
-  const [imageUri, setImageUri] = useState(initialValues?.imageUri ?? null);
   const [name, setName] = useState(initialValues?.name ?? "");
+  const [description, setDescription] = useState(
+    initialValues?.description ?? "",
+  );
   const [categoryId, setCategoryId] = useState(
     initialValues?.categoryId ?? null,
   );
   const [price, setPrice] = useState(initialValues?.price ?? "");
+  const [status, setStatus] = useState<ProductStatus>(
+    initialValues?.status ?? "Active",
+  );
   const [ingredients, setIngredients] = useState<IngredientLine[]>(
     initialValues?.ingredients ?? [newLine()],
   );
   const [sizesEnabled, setSizesEnabled] = useState(
     initialValues?.sizesEnabled ?? false,
   );
-  const [sizes, setSizes] = useState<Variant[]>(
-    initialValues?.sizes ?? [newVariant()],
+  const [sizes, setSizes] = useState<SizeRow[]>(
+    initialValues?.sizes?.length ? initialValues.sizes : [newSize()],
   );
-  const [addOnsEnabled, setAddOnsEnabled] = useState(
-    initialValues?.addOnsEnabled ?? false,
-  );
-  const [addOns, setAddOns] = useState<Variant[]>(
-    initialValues?.addOns ?? [newVariant()],
+  const [disabledAddOnIds, setDisabledAddOnIds] = useState<number[]>(
+    initialValues?.disabledAddOnIds ?? [],
   );
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // Add-ons the selected category offers.
+  const offeredAddOns = categoryId
+    ? addOns.filter((a) => a.categoryIds.includes(Number(categoryId)))
+    : [];
+
+  /* ---- validation (mirrors the API rules) ---- */
+  const cleanedBase = cleanLines(ingredients);
+  const cleanedSizes = sizesEnabled ? cleanSizes(sizes) : [];
+
+  const sizesError = (() => {
+    if (!sizesEnabled) return undefined;
+    if (cleanedSizes.length === 0)
+      return "Add at least one size, or turn sizes off.";
+    const names = cleanedSizes.map((s) => s.name.toLowerCase());
+    if (new Set(names).size !== names.length)
+      return "Size names must be different.";
+    if (!cleanedSizes.some((s) => Number(s.extraCost || 0) === 0))
+      return "One size must have an additional cost of +₱0 (the base size).";
+    if (cleanedSizes.some((s) => hasDuplicateIngredient(s.ingredients)))
+      return "A size recipe can't list the same ingredient twice.";
+    return undefined;
+  })();
+
   const errors = {
     name: name.trim().length === 0 ? "Product name is required" : undefined,
     category: categoryId === null ? "Pick a category" : undefined,
-    price: price.length === 0 ? "Base price is required" : undefined,
+    price:
+      price.length === 0 || Number.isNaN(Number(price))
+        ? "Enter a valid base price"
+        : undefined,
+    ingredients:
+      cleanedBase.length === 0
+        ? "Add at least one ingredient with a quantity"
+        : hasDuplicateIngredient(cleanedBase)
+          ? "A recipe can't list the same ingredient twice"
+          : undefined,
+    sizes: sizesError,
   };
-  const isValid = !errors.name && !errors.category && !errors.price;
+  const isValid = Object.values(errors).every((e) => !e);
+
+  const toggleAddOn = (id: number, enabled: boolean) =>
+    setDisabledAddOnIds((prev) =>
+      enabled ? prev.filter((x) => x !== id) : [...prev, id],
+    );
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -772,7 +848,7 @@ export default function ProductFormScreen({
     if (result.canceled) return;
     const asset = result.assets[0];
     if (asset.fileSize && asset.fileSize > MAX_IMAGE_BYTES) {
-      Alert.alert("Image too large", "Please choose a photo up to 5MB.");
+      notify("Image too large", "Please choose a photo up to 5MB.");
       return;
     }
     setImageUri(asset.uri);
@@ -787,17 +863,19 @@ export default function ProductFormScreen({
     }
     setSaving(true);
     try {
-      // Half-filled rows are dropped; sections toggled off are saved as empty.
+      const offeredIds = new Set(offeredAddOns.map((a) => a.id));
       await onSave({
         imageUri,
         name: name.trim(),
+        description: description.trim(),
         categoryId,
         price,
-        ingredients: cleanLines(ingredients),
+        status,
+        ingredients: cleanedBase,
         sizesEnabled,
-        sizes: sizesEnabled ? cleanVariants(sizes) : [],
-        addOnsEnabled,
-        addOns: addOnsEnabled ? cleanVariants(addOns) : [],
+        sizes: cleanedSizes,
+        // Only add-ons the chosen category still offers can be switched off.
+        disabledAddOnIds: disabledAddOnIds.filter((id) => offeredIds.has(id)),
       });
     } finally {
       setSaving(false);
@@ -816,25 +894,23 @@ export default function ProductFormScreen({
           keyboardShouldPersistTaps="handled"
         >
           {/* Page title */}
-          <View className="flex-row items-start justify-between">
-            <View className="flex-1 gap-1">
-              <Text className="text-3xl font-bold text-neutral-900">
-                {mode === "new" ? "Create New Product" : "Edit Product"}
-              </Text>
-              <Text className="text-xs text-neutral-500">
-                Configure base details, pricing, standard recipe deductions, cup
-                sizes, and beverage add-ons.
+          <View className="gap-1">
+            <Text className="text-3xl font-bold text-neutral-900">
+              {mode === "new" ? "Create New Product" : "Edit Product"}
+            </Text>
+            <Text className="text-xs text-neutral-500">
+              Configure base details, pricing, standard recipe deductions,
+              sizes, and which category add-ons apply.
+            </Text>
+          </View>
+
+          {submitted && !isValid && (
+            <View className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3">
+              <Text className="text-sm text-rose-700">
+                Please fix the highlighted fields below.
               </Text>
             </View>
-            {syncActive && (
-              <View className="flex-row items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1">
-                <View className="h-1.5 w-1.5 rounded-full bg-green-600" />
-                <Text className="text-[11px] font-medium text-green-700">
-                  Inventory Sync Active
-                </Text>
-              </View>
-            )}
-          </View>
+          )}
 
           {/* Basic Information */}
           <Card>
@@ -889,9 +965,22 @@ export default function ProductFormScreen({
                     onChangeText={setName}
                     placeholder="e.g. Iced Caramel Macchiato"
                     placeholderTextColor={MUTED}
+                    maxLength={100}
                     className={`h-11 rounded-lg border bg-white px-3 text-sm text-neutral-900 focus:border-rose-500 ${submitted && errors.name ? "border-rose-500" : "border-neutral-200"}`}
                   />
                   {submitted && <ErrorText text={errors.name} />}
+                </View>
+
+                <View>
+                  <Label text="Description" />
+                  <TextInput
+                    value={description}
+                    onChangeText={setDescription}
+                    placeholder="Short description (optional)"
+                    placeholderTextColor={MUTED}
+                    maxLength={255}
+                    className="h-11 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 focus:border-rose-500"
+                  />
                 </View>
 
                 <View className="flex-row gap-4">
@@ -916,63 +1005,66 @@ export default function ProductFormScreen({
                     />
                     {submitted && <ErrorText text={errors.price} />}
                   </View>
+                  <View className="flex-1">
+                    <Label text="Status" required />
+                    <Select
+                      value={status}
+                      options={STATUS_OPTIONS}
+                      onChange={(id) => setStatus(id as ProductStatus)}
+                    />
+                  </View>
                 </View>
 
                 <BaseRecipe
                   lines={ingredients}
                   ingredientOptions={ingredientOptions}
                   onChange={setIngredients}
+                  error={submitted ? errors.ingredients : undefined}
                 />
               </View>
             </View>
           </Card>
 
           {/* Sizes & Portions */}
-          <VariantSection
-            icon="resize-outline"
-            title="Sizes & Portions"
-            subtitle="Define serving sizes, additional price charges, and specific inventory subtractions."
+          <SizesSection
             enabled={sizesEnabled}
             onToggle={setSizesEnabled}
             rows={sizes}
             onChange={setSizes}
             ingredientOptions={ingredientOptions}
-            nameLabel="Variant name"
-            namePlaceholder="e.g. Regular 12oz (Hot/Cold)"
-            costLabel="Additional cost (+₱)"
-            addLabel="Add Size"
-            badgeFor={sizeBadge}
+            error={submitted ? errors.sizes : undefined}
           />
 
-          {/* Add-ons */}
-          <VariantSection
-            icon="add-circle-outline"
-            title="Add-ons & Extras"
-            subtitle="Optional extras customers can add, with their own price and inventory deductions."
-            enabled={addOnsEnabled}
-            onToggle={setAddOnsEnabled}
-            rows={addOns}
-            onChange={setAddOns}
-            ingredientOptions={ingredientOptions}
-            nameLabel="Add-on name"
-            namePlaceholder="e.g. Extra shot"
-            costLabel="Additional cost (+₱)"
-            addLabel="Add Add-on"
-            badgeFor={addOnBadge}
+          {/* Add-ons (switch off per product) */}
+          <AddOnsSection
+            categoryChosen={categoryId !== null}
+            offered={offeredAddOns}
+            disabledIds={disabledAddOnIds}
+            onToggle={toggleAddOn}
           />
         </ScrollView>
 
         {/* Sticky action bar */}
         <View className="flex-row items-center justify-between border-t border-rose-100 bg-white px-8 py-4">
-          <View className="flex-row items-center gap-2">
-            <Ionicons name="cloud-done-outline" size={16} color={ROSE} />
-            <Text className="text-xs text-neutral-500">
-              Changes ready to publish to POS terminals
-            </Text>
+          <View>
+            {mode === "edit" && onDelete ? (
+              <Pressable
+                onPress={onDelete}
+                disabled={saving}
+                className="h-11 flex-row items-center gap-2 rounded-lg border border-rose-300 bg-white px-4 active:bg-rose-50"
+              >
+                <Ionicons name="trash-outline" size={16} color={ROSE} />
+                <Text className="text-sm font-medium text-rose-700">
+                  Delete product
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
+
           <View className="flex-row gap-3">
             <Pressable
               onPress={onCancel}
+              disabled={saving}
               className="h-11 items-center justify-center rounded-lg border border-neutral-300 bg-white px-6 active:bg-neutral-100"
             >
               <Text className="text-sm font-medium text-neutral-800">
