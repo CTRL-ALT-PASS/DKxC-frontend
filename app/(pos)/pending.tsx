@@ -10,7 +10,7 @@ export default function PendingOrdersScreen() {
   });
 
   return (
-    <View className="flex-1 bg-cream">
+    <View className="flex-1 bg-neutral">
       <Header title="Pending Orders" date={today} />
     </View>
   );

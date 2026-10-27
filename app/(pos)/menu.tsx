@@ -86,7 +86,7 @@ export default function POSScreen() {
   if (!user) return null;
 
   return (
-    <View className="flex-1 bg-[#F4F6F4]">
+    <View className="flex-1 bg-neutral">
       <Header title="Darcy's Kitchen & Cafe POS" date={today} />
 
       <View className="flex-1 flex-row">

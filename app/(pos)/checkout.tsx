@@ -22,7 +22,7 @@ export default function TransactionHistoryScreen() {
   if (!user) return null;
 
   return (
-    <View className="flex-1 bg-cream">
+    <View className="flex-1 bg-neutral">
       <Header
         title="Order History"
         date={today}
