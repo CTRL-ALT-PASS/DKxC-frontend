@@ -9,6 +9,7 @@ import InventoryItemActions from "../../components/inventory/inventory/Inventory
 import InventoryRow, {
   COLUMN_WIDTHS,
   InventoryItem,
+  NAME_ICON_OFFSET,
 } from "../../components/inventory/inventory/InventoryRow";
 import StockAdjustSheet from "../../components/inventory/inventory/StockAdjustSheet";
 
@@ -68,22 +69,19 @@ export default function InventoryScreen() {
 
         {/* Column labels (plain text, no filled header bar) */}
         <View className="flex-row px-5 mb-3">
-          <Text className="flex-1 text-[13px] font-semibold text-secondary/70">
+          <Text className={`flex-1 ${NAME_ICON_OFFSET} text-[13px] font-semibold text-secondary/70`}>
             Item Name
           </Text>
-          <Text
-            className={`${COLUMN_WIDTHS.lastUpdate} text-[13px] font-semibold text-secondary/70`}
-          >
+          <Text className={`${COLUMN_WIDTHS.category} text-[13px] font-semibold text-secondary/70`}>
+            Category
+          </Text>
+          <Text className={`${COLUMN_WIDTHS.lastUpdate} text-[13px] font-semibold text-secondary/70`}>
             Last Stock Update
           </Text>
-          <Text
-            className={`${COLUMN_WIDTHS.stocks} text-[13px] font-semibold text-secondary/70`}
-          >
+          <Text className={`${COLUMN_WIDTHS.stocks} text-[13px] font-semibold text-secondary/70`}>
             In Stock
           </Text>
-          <Text
-            className={`${COLUMN_WIDTHS.status} text-[13px] font-semibold text-secondary/70`}
-          >
+          <Text className={`${COLUMN_WIDTHS.status} text-[13px] font-semibold text-secondary/70`}>
             Status
           </Text>
           <Text

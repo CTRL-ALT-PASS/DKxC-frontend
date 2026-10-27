@@ -2,7 +2,10 @@ import menuIcon from "@/assets/icons/menu.png";
 import warningIcon from "@/assets/icons/warning.png";
 import { Diff } from "lucide-react-native";
 import { Image, Pressable, Text, View } from "react-native";
-import { InventoryCategory } from "../../../types/inventoryCategories";
+import {
+  getCategory,
+  InventoryCategory,
+} from "../../../types/inventoryCategories";
 
 // Alternative unit an item can be received/used in (e.g. Carton = 1000 mL).
 export type StockUnit = {
@@ -10,7 +13,7 @@ export type StockUnit = {
   name: string; // "Carton"
   note: string; // "1 L = 1,000 mL"
   factor: number; // how many base units in one of this unit
-  abbr?: string;   // NEW: "L", "BTL"
+  abbr?: string; // "L", "BTL"
 };
 
 export type InventoryItem = {
@@ -22,12 +25,13 @@ export type InventoryItem = {
   lastStockUpdate: string; // display string, e.g. "Oct 15, 2026 · 3:42 PM"
   units?: StockUnit[]; // optional extra units besides the base unit
   status: "Available" | "Low Stock" | "Out of Stock";
-  reorderLevel?: number; // NEW: in base units
-  category?: InventoryCategory; // NEW
+  reorderLevel?: number; // in base units
+  category?: InventoryCategory;
 };
 
 // Shared with the header so the columns always line up.
 export const COLUMN_WIDTHS = {
+  category: "w-[170px]",
   lastUpdate: "w-[200px]",
   stocks: "w-[160px]",
   status: "w-[110px]",
@@ -35,6 +39,10 @@ export const COLUMN_WIDTHS = {
   adjust: "w-[56px]",
   menu: "w-[48px]",
 } as const;
+
+// Category icon box (w-9 = 36px) + gap (mr-3 = 12px) = 48px = pl-12.
+// The header's "Item Name" label uses this so it lines up with the names.
+export const NAME_ICON_OFFSET = "pl-12";
 
 const fmt = (n: number) =>
   n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -52,14 +60,31 @@ export default function InventoryRow({
 }: Props) {
   const isOut = item.status === "Out of Stock";
   const isLow = item.status !== "Available";
-  
+  const category = getCategory(item.category);
+  const CategoryIcon = category.icon;
+
   return (
     <View className="flex-row items-center h-16 px-5 bg-white border border-tertiary-soft/50 rounded-xl">
+      <View className="flex-1 flex-row items-center">
+        <View
+          className="mr-3 h-9 w-9 items-center justify-center rounded-lg bg-neutral"
+          accessibilityLabel={category.name}
+        >
+          <CategoryIcon size={20} color="#BE185D" strokeWidth={2} />
+        </View>
+        <Text
+          className="flex-1 text-[17px] font-semibold text-secondary"
+          numberOfLines={1}
+        >
+          {item.itemName}
+        </Text>
+      </View>
+
       <Text
-        className="flex-1 text-[17px] font-semibold text-secondary"
+        className={`${COLUMN_WIDTHS.category} pr-3 text-[15px] text-secondary/70`}
         numberOfLines={1}
       >
-        {item.itemName}
+        {category.name}
       </Text>
 
       <Text
