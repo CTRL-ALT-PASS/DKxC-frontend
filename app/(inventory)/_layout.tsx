@@ -21,7 +21,12 @@ const NAV = [
     title: "Products",
     alsoMatches: ["product-form"], // add/edit screen belongs to Products
   },
-  { key: "inventory", icon: Package, title: "Inventory" },
+  {
+    key: "inventory",
+    icon: Package,
+    title: "Inventory",
+    alsoMatches: ["inventory-logs"],
+  },
   { key: "employees", icon: Users, title: "Employees" },
 ];
 
@@ -64,7 +69,12 @@ export default function TabsLayout() {
 
   return (
     <View className="flex-1 flex-row">
-      <Sidebar navItems={navItems} onLogout={handleLogout} logo={darcyMark} defaultCollapsed/>
+      <Sidebar
+        navItems={navItems}
+        onLogout={handleLogout}
+        logo={darcyMark}
+        defaultCollapsed
+      />
       <View className="flex-1">
         <Header title={activeTitle} date={today} />
         <Slot />

@@ -37,7 +37,7 @@ export default function ProductsScreen() {
     });
 
   return (
-    <View className="flex-1 bg-[#F4F6F4] p-6">
+    <View className="flex-1 bg-neutral p-6">
       {/* Search and actions */}
       <View className="flex-row items-center justify-between mb-4">
         <SearchBar

@@ -354,7 +354,7 @@ export default function EmployeeScreen() {
   );
 
   return (
-    <View className="flex-1 gap-4 bg-[#F4F6F4] p-6">
+    <View className="flex-1 gap-4 bg-neutral p-6">
       {/* Toolbar */}
       <View className="flex-row items-center gap-4 rounded-2xl border border-[#E4E7E4] bg-[#FBFAF7] p-3">
         <View className="h-11 flex-1 flex-row items-center gap-3 rounded-xl border border-[#E4E7E4] bg-[#F4F4F0] px-4">

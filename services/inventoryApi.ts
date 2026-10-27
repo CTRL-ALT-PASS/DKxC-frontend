@@ -1,5 +1,10 @@
 import { API_BASE_URL, API_PREFIX } from "../config/api/apiConfig";
+import {
+  toCategory,
+  type InventoryCategory,
+} from "../types/inventoryCategories";
 import { formatDateTime } from "../utils/formatDateTime";
+
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
@@ -9,11 +14,7 @@ export type BaseUnit = "g" | "kg" | "mL" | "L" | "pcs";
 export type InventoryStatus = "Available" | "Low Stock" | "Out of Stock";
 
 export type MovementType =
-  | "Restock"
-  | "Return"
-  | "Spoilage"
-  | "Damage"
-  | "Adjustment";
+  "Restock" | "Return" | "Spoilage" | "Damage" | "Adjustment";
 
 export type InventoryUnit = {
   unit_name: string;
@@ -23,6 +24,7 @@ export type InventoryUnit = {
 export type InventoryItem = {
   inventory_item_id: number;
   item_name: string;
+  item_category: InventoryCategory; // normalized: unknown/missing -> "Other"
   base_unit: BaseUnit;
   quantity_on_hand: number;
   reorder_level: number;
@@ -49,13 +51,50 @@ export type StockMovement = {
   occurred_at_label: string; // formatted for display
 };
 
+// The log endpoint also returns "Sale" rows; manual movements can't be Sale.
+export type MovementLogType = MovementType | "Sale";
+
+export type MovementLogEntry = Omit<
+  StockMovement,
+  "movement_type" | "entered_quantity" | "entered_unit"
+> & {
+  movement_type: MovementLogType;
+  // Sale rows have no entered quantity/unit, so these can be null.
+  entered_quantity: number | null;
+  entered_unit: string | null;
+  item_name: string | null;
+  base_unit: BaseUnit | null;
+  employee_name: string | null;
+};
+
+export type MovementLogFilters = {
+  type?: MovementLogType[];
+  source?: "sale" | "manual"; // manual = everything except Sale
+  inventory_item_id?: number;
+  employee_id?: string;
+  order_id?: number;
+  search?: string; // matches item name or employee name
+  category?: InventoryCategory[];
+  from?: string; // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
+  per_page?: number;
+  cursor?: string;
+};
+
+export type MovementLogPage = {
+  data: MovementLogEntry[];
+  nextCursor: string | null;
+};
+
 export type InventoryListFilters = {
   search?: string;
   inventory_status?: InventoryStatus;
+  item_category?: InventoryCategory;
 };
 
 export type CreateInventoryItemInput = {
   item_name: string;
+  item_category: InventoryCategory;
   base_unit: BaseUnit;
   reorder_level?: number;
   cost_per_base_unit?: number;
@@ -65,6 +104,7 @@ export type CreateInventoryItemInput = {
 // base_unit, quantity_on_hand and inventory_status cannot be sent on update.
 export type UpdateInventoryItemInput = {
   item_name?: string;
+  item_category?: InventoryCategory;
   reorder_level?: number;
   cost_per_base_unit?: number;
   // Replaces the WHOLE list on the server. Always send every unit you want to keep.
@@ -200,6 +240,7 @@ function mapInventoryItem(raw: any): InventoryItem {
   return {
     inventory_item_id: raw.inventory_item_id,
     item_name: raw.item_name,
+    item_category: toCategory(raw.item_category),
     base_unit: raw.base_unit,
     quantity_on_hand: toNumber(raw.quantity_on_hand),
     reorder_level: toNumber(raw.reorder_level),
@@ -232,31 +273,27 @@ function mapMovement(raw: any): StockMovement {
   };
 }
 
-function parseApiDate(value: string): Date {
-  // "2026-09-01 08:00:00+08" -> "2026-09-01T08:00:00+08:00"
-  const iso = value
-    .replace(" ", "T")
-    .replace(/(\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)([+-]\d{2})$/, "$1$2:00");
-  return new Date(iso);
-}
-
-function formatLastRestocked(value: string | null): string {
-  if (!value) return "No stock yet";
-
-  const date = parseApiDate(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  const day = date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-  const time = date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-
-  return `${day} · ${time}`;
+function mapMovementLogEntry(raw: any): MovementLogEntry {
+  return {
+    ledger_id: raw.ledger_id,
+    inventory_item_id: raw.inventory_item_id,
+    movement_type: raw.movement_type,
+    quantity_change: toNumber(raw.quantity_change),
+    entered_quantity: toNullableNumber(raw.entered_quantity),
+    entered_unit: raw.entered_unit ?? null,
+    unit_cost: toNullableNumber(raw.unit_cost),
+    order_id: raw.order_id ?? null,
+    employee_id: raw.employee_id,
+    reason: raw.reason ?? null,
+    reference_number: raw.reference_number ?? null,
+    occurred_at: raw.occurred_at,
+    occurred_at_label: formatDateTime(raw.occurred_at),
+    item_name: raw.item?.item_name ?? null,
+    base_unit: raw.item?.base_unit ?? null,
+    employee_name: raw.employee
+      ? `${raw.employee.first_name} ${raw.employee.last_name}`
+      : null,
+  };
 }
 
 // The API expects decimal fields as strings in request bodies.
@@ -279,6 +316,7 @@ export async function getInventoryItems(
     query: {
       search: filters.search?.trim(),
       inventory_status: filters.inventory_status,
+      item_category: filters.item_category,
     },
   });
 
@@ -302,6 +340,7 @@ export async function createInventoryItem(
     body: {
       item_name: input.item_name.trim(),
       base_unit: input.base_unit,
+      item_category: input.item_category,
       ...(input.reorder_level !== undefined && {
         reorder_level: String(input.reorder_level),
       }),
@@ -323,7 +362,12 @@ export async function updateInventoryItem(
   const data = await request<{ data: any }>(token, `/inventory-items/${id}`, {
     method: "PATCH",
     body: {
-      ...(input.item_name !== undefined && { item_name: input.item_name.trim() }),
+      ...(input.item_name !== undefined && {
+        item_name: input.item_name.trim(),
+      }),
+      ...(input.item_category !== undefined && {
+        item_category: input.item_category,
+      }),
       ...(input.reorder_level !== undefined && {
         reorder_level: String(input.reorder_level),
       }),
@@ -384,5 +428,38 @@ export async function recordStockMovement(
   return {
     ledger: mapMovement(data.data.ledger),
     inventory_item: mapInventoryItem(data.data.inventory_item),
+  };
+}
+
+/** Paginated (cursor) movements across ALL items. Pass `nextCursor` back as `cursor` for the next page. */
+export async function getInventoryMovements(
+  token: string,
+  filters: MovementLogFilters = {},
+): Promise<MovementLogPage> {
+  const data = await request<{ data: any[]; next_cursor: string | null }>(
+    token,
+    "/inventory-movements",
+    {
+      query: {
+        type: filters.type?.length ? filters.type.join(",") : undefined,
+        source: filters.source,
+        inventory_item_id: filters.inventory_item_id?.toString(),
+        employee_id: filters.employee_id,
+        order_id: filters.order_id?.toString(),
+        search: filters.search?.trim(),
+        category: filters.category?.length
+          ? filters.category.join(",")
+          : undefined,
+        from: filters.from,
+        to: filters.to,
+        per_page: filters.per_page?.toString(),
+        cursor: filters.cursor,
+      },
+    },
+  );
+
+  return {
+    data: data.data.map(mapMovementLogEntry),
+    nextCursor: data.next_cursor ?? null,
   };
 }

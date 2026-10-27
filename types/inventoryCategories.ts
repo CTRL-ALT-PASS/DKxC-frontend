@@ -1,12 +1,12 @@
 import {
-    Boxes,
-    ChefHat,
-    Coffee,
-    FlaskConical,
-    Milk,
-    Package,
-    Wheat,
-    type LucideIcon,
+  Boxes,
+  ChefHat,
+  Coffee,
+  FlaskConical,
+  Milk,
+  Package,
+  Wheat,
+  type LucideIcon,
 } from "lucide-react-native";
 
 export const INVENTORY_CATEGORIES = [
@@ -26,3 +26,6 @@ export const DEFAULT_CATEGORY: InventoryCategory = "Other";
 export const getCategory = (name?: string) =>
   INVENTORY_CATEGORIES.find((c) => c.name === name) ??
   INVENTORY_CATEGORIES[INVENTORY_CATEGORIES.length - 1];
+
+export const toCategory = (value?: string | null): InventoryCategory =>
+  INVENTORY_CATEGORIES.find((c) => c.name === value)?.name ?? DEFAULT_CATEGORY;
