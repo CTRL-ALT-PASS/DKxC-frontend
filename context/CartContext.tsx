@@ -1,5 +1,5 @@
-import type { Product } from "@/constants/mockData";
 import { useAuth } from "@/context/AuthContext";
+import type { Product } from "@/services/productsApi";
 import { recordTransaction } from "@/services/transactionsApi";
 import {
   createContext,
@@ -8,14 +8,18 @@ import {
   useContext,
   useReducer,
 } from "react";
-import { getLineTotal, getOrderTotals } from "../constants/pricing";
+import {
+  getLineTotal,
+  getOrderTotals,
+  type OrderOptions,
+} from "../constants/pricing";
 
 export interface CartItem {
   key: string;
   product: Product;
   quantity: number;
-  options?: Record<string, string>;
-  discountPercent?: number; // promo (e.g. 40 or 100) -- covers ONE drink of this line only
+  options?: OrderOptions;
+  discountPercent?: number;
 }
 
 export type OrderType = "Dine In" | "Take out";
@@ -56,11 +60,11 @@ interface CartState {
 }
 
 type CartAction =
-  | { type: "ADD"; product: Product; options?: Record<string, string> }
+  | { type: "ADD"; product: Product; options?: OrderOptions }
   | {
       type: "ADD_CUSTOMIZED";
       product: Product;
-      options: Record<string, string>;
+      options: OrderOptions;
       quantity: number;
       discountPercent?: number;
     }
@@ -73,7 +77,7 @@ type CartAction =
       oldKey: string;
       product: Product;
       quantity: number;
-      newOptions: Record<string, string>;
+      newOptions: OrderOptions;
     }
   | { type: "SET_ORDER_TYPE"; orderType: OrderType }
   | { type: "SET_SENIOR_PWD"; enabled: boolean }
@@ -89,7 +93,7 @@ type CartAction =
       type: "EDIT_PENDING_ITEM";
       orderId: string;
       key: string;
-      options: Record<string, string>;
+      options: OrderOptions;
       quantity: number;
       discountPercent?: number;
     }
@@ -103,16 +107,10 @@ type CartAction =
 // repeated taps merge into one line with a growing quantity. Customized
 // products get a fresh unique key per add (see ADD below), so each one stays
 // its own editable line.
-export function makeCartKey(
-  productId: string,
-  options?: Record<string, string>,
-) {
-  if (!options) return productId;
-  const sorted = Object.keys(options)
-    .sort()
-    .map((k) => `${k}:${options[k]}`)
-    .join("|");
-  return `${productId}::${sorted}`;
+export function makeCartKey(productId: number, options?: OrderOptions) {
+  if (!options) return String(productId);
+  const addOns = [...options.addOnIds].sort((a, b) => a - b).join(",");
+  return `${productId}::s${options.sizeId ?? "-"}|a${addOns}`;
 }
 
 function uniqueSuffix() {
@@ -151,8 +149,8 @@ function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD": {
       const key = action.options
-        ? `${makeCartKey(action.product.id, action.options)}::${uniqueSuffix()}`
-        : makeCartKey(action.product.id);
+        ? `${makeCartKey(action.product.product_id, action.options)}::${uniqueSuffix()}`
+        : makeCartKey(action.product.product_id);
       const existing = state.items[key];
       const quantity = (existing?.quantity || 0) + 1;
       return {
@@ -173,7 +171,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       // its own line (quantity 1) and the remaining drinks share a plain line, so
       // the discount can only ever land on a single drink.
       const count = Math.max(1, Math.floor(action.quantity));
-      const base = makeCartKey(action.product.id, action.options);
+      const base = makeCartKey(action.product.product_id, action.options);
       const items = { ...state.items };
       const plainCount = action.discountPercent ? count - 1 : count;
       if (action.discountPercent) {
@@ -229,7 +227,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
     case "EDIT_OPTIONS": {
       const { [action.oldKey]: _removed, ...rest } = state.items;
-      const newKey = makeCartKey(action.product.id, action.newOptions);
+      const newKey = makeCartKey(action.product.product_id.action.newOptions);
       const existingAtNewKey = rest[newKey];
       const mergedQuantity =
         (existingAtNewKey?.quantity || 0) + action.quantity;
@@ -271,10 +269,14 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ),
       }));
     case "REMOVE_PENDING_ITEM": {
-      const updatedState = updatePendingOrder(state, action.orderId, (order) => ({
-        ...order,
-        items: order.items.filter((item) => item.key !== action.key),
-      }));
+      const updatedState = updatePendingOrder(
+        state,
+        action.orderId,
+        (order) => ({
+          ...order,
+          items: order.items.filter((item) => item.key !== action.key),
+        }),
+      );
       return {
         ...updatedState,
         pendingOrders: updatedState.pendingOrders.filter(

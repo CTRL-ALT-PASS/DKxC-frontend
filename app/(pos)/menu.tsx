@@ -1,9 +1,12 @@
 import SearchBar from "@/components/shared/SearchBar";
+import { useProducts } from "@/hooks/use-products";
 import { useSearch } from "@/hooks/use-search";
+import type { Product } from "@/services/productsApi";
 import { useRouter } from "expo-router";
 import { ClipboardCheck } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   Switch,
   Text,
@@ -17,7 +20,6 @@ import Header from "../../components/Header";
 import ProductCard from "../../components/ProductCard";
 import ProductOptionsModal from "../../components/ProductOptionsModal";
 import ProductGrid from "../../components/shared/ProductGrid";
-import { CATEGORIES, PRODUCTS, type Product } from "../../constants/mockData";
 import {
   formatOptions,
   formatPromo,
@@ -27,12 +29,33 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 
+// TODO: replace with a /categories endpoint. IDs match the seeded `category` table.
+const CATEGORY_NAMES: Record<number, string> = {
+  1: "Espresso",
+  2: "Pasta",
+  3: "Chicken Katsu Series",
+  4: "Snacks",
+  5: "Chicken Karaage",
+  6: "All-Day Breakfast",
+  7: "Fruit Tea",
+  8: "Non-Coffee",
+  9: "Matcha",
+};
+const CATEGORY_OPTIONS = ["All", ...Object.values(CATEGORY_NAMES)];
+const CATEGORY_ID_BY_NAME: Record<string, number> = Object.fromEntries(
+  Object.entries(CATEGORY_NAMES).map(([id, name]) => [name, Number(id)]),
+);
+
+// Stable reference so useProducts doesn't see a new filters object each render
+const POS_FILTERS = { product_status: "Active" } as const;
+
 export default function POSScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { user } = useAuth();
   const [category, setCategory] = useState("All");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const { products, loading, error, refetch } = useProducts(POS_FILTERS);
   const {
     items,
     list,
@@ -54,15 +77,20 @@ export default function POSScreen() {
   });
 
   const categoryFiltered = useMemo(
-    () => PRODUCTS.filter((p) => category === "All" || p.category === category),
-    [category],
+    () =>
+      category === "All"
+        ? products
+        : products.filter(
+            (p) => p.category_id === CATEGORY_ID_BY_NAME[category],
+          ),
+    [products, category],
   );
 
   const {
     query,
     setQuery,
     results: filtered,
-  } = useSearch(categoryFiltered, (p) => p.name);
+  } = useSearch(categoryFiltered, (p) => p.product_name);
 
   const chooseOrderType = (type: "Dine In" | "Take out") => {
     dispatch({ type: "SET_ORDER_TYPE", orderType: type });
@@ -91,28 +119,45 @@ export default function POSScreen() {
               className="w-80 mr-4"
             />
             <CategoryDropdown
-              categories={CATEGORIES}
+              categories={CATEGORY_OPTIONS}
               selected={category}
               onSelect={setCategory}
               chevronIcon={chevronIcon}
             />
           </View>
 
-          {filtered.length === 0 ? (
+          {loading && products.length === 0 ? (
+            <View className="mt-6 items-start">
+              <ActivityIndicator />
+            </View>
+          ) : error ? (
+            <View className="mt-6">
+              <Text className="text-warn mb-2">
+                Couldn't load products: {error.message}
+              </Text>
+              <Pressable
+                onPress={refetch}
+                className="self-start rounded-xl bg-primary px-4 py-2"
+              >
+                <Text className="text-white font-semibold">Retry</Text>
+              </Pressable>
+            </View>
+          ) : filtered.length === 0 ? (
             <Text className="text-slate-400 mt-6">No products found.</Text>
           ) : (
             <ProductGrid
               data={filtered}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => String(item.product_id)}
               extraData={items}
               renderCard={(item) => (
                 <ProductCard
                   product={item}
-                  quantity={items[item.id]?.quantity || 0}
+                  categoryName={CATEGORY_NAMES[item.category_id] ?? "Other"}
+                  quantity={items[String(item.product_id)]?.quantity || 0}
                   addIcon={addIcon}
                   onIncrease={() => dispatch({ type: "ADD", product: item })}
                   onDecrease={() =>
-                    dispatch({ type: "DECREASE", key: item.id })
+                    dispatch({ type: "DECREASE", key: String(item.product_id) })
                   }
                   onOpenSpecs={() => setActiveProduct(item)}
                 />
@@ -120,6 +165,7 @@ export default function POSScreen() {
             />
           )}
         </View>
+
         <View
           style={{ width: summaryWidth }}
           className="bg-white p-6 border-l border-slate-200"
@@ -134,11 +180,11 @@ export default function POSScreen() {
             >
               <View className="flex-1 pr-2">
                 <Text>
-                  {entry.product.name} ({entry.quantity}x)
+                  {entry.product.product_name} ({entry.quantity}x)
                 </Text>
                 {entry.options && (
                   <Text className="text-xs text-slate-500">
-                    {formatOptions(entry.options)}
+                    {formatOptions(entry.product, entry.options)}
                   </Text>
                 )}
                 {!!entry.discountPercent && (
@@ -281,7 +327,7 @@ export default function POSScreen() {
       </View>
 
       <ProductOptionsModal
-        key={activeProduct?.id ?? "closed"}
+        key={activeProduct?.product_id ?? "closed"}
         product={activeProduct}
         visible={!!activeProduct}
         onClose={() => setActiveProduct(null)}
