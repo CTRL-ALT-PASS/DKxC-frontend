@@ -1,16 +1,25 @@
-import { useAuth } from "@/context/AuthContext";
+import {
+  createOrder,
+  type Order,
+  type OrderInput,
+  type OrderItemInput,
+} from "@/services/ordersApi";
 import type { Product } from "@/services/productsApi";
-import { recordTransaction } from "@/services/transactionsApi";
 import {
   createContext,
   Dispatch,
   ReactNode,
   useContext,
   useReducer,
+  useRef,
+  useState,
 } from "react";
 import {
   getLineTotal,
   getOrderTotals,
+  ORDER_TYPE_TO_API,
+  PROMO_CODE_BY_PERCENT,
+  SENIOR_PWD_CODE,
   type OrderOptions,
 } from "../constants/pricing";
 
@@ -19,44 +28,16 @@ export interface CartItem {
   product: Product;
   quantity: number;
   options?: OrderOptions;
-  discountPercent?: number;
+  discountPercent?: number; // promo (40 or 100), covers ONE unit of this line only
 }
 
 export type OrderType = "Dine In" | "Take out";
 export type PaymentMode = "Cash" | "Cashless";
 
-export interface Transaction {
-  id: string;
-  employeeId: string; // the cashier who processed it -- order history only shows a cashier their own orders
-  cashierName: string;
-  items: CartItem[];
-  subtotal: number; // before the PWD / Senior discount
-  seniorPwdDiscount: number; // pesos taken off by that discount (0 when it wasn't applied)
-  total: number;
-  orderType: OrderType;
-  paymentMode: PaymentMode;
-  completedAt: string;
-}
-
-export interface PendingOrder {
-  id: string;
-  employeeId: string;
-  cashierName: string;
-  items: CartItem[];
-  subtotal: number;
-  seniorPwdDiscount: number;
-  seniorPwd: boolean;
-  total: number;
-  orderType: OrderType;
-  createdAt: string;
-}
-
 interface CartState {
   items: Record<string, CartItem>;
   orderType: OrderType;
   seniorPwd: boolean;
-  pendingOrders: PendingOrder[];
-  transactions: Transaction[];
 }
 
 type CartAction =
@@ -80,33 +61,10 @@ type CartAction =
       newOptions: OrderOptions;
     }
   | { type: "SET_ORDER_TYPE"; orderType: OrderType }
-  | { type: "SET_SENIOR_PWD"; enabled: boolean }
-  | { type: "PLACE_ORDER"; order: PendingOrder }
-  | {
-      type: "CHANGE_PENDING_ITEM_QUANTITY";
-      orderId: string;
-      key: string;
-      delta: number;
-    }
-  | { type: "REMOVE_PENDING_ITEM"; orderId: string; key: string }
-  | {
-      type: "EDIT_PENDING_ITEM";
-      orderId: string;
-      key: string;
-      options: OrderOptions;
-      quantity: number;
-      discountPercent?: number;
-    }
-  | {
-      type: "COMPLETE_PENDING_ORDER";
-      orderId: string;
-      transaction: Transaction;
-    };
+  | { type: "SET_SENIOR_PWD"; enabled: boolean };
 
-// Simple (non-customized) products get a key equal to their plain id, so
-// repeated taps merge into one line with a growing quantity. Customized
-// products get a fresh unique key per add (see ADD below), so each one stays
-// its own editable line.
+// Simple products (no options) key on their plain id so repeated taps merge.
+// Customized products get a unique key per add so each stays its own line.
 export function makeCartKey(productId: number, options?: OrderOptions) {
   if (!options) return String(productId);
   const addOns = [...options.addOnIds].sort((a, b) => a - b).join(",");
@@ -117,34 +75,6 @@ function uniqueSuffix() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function recalculatePendingOrder(order: PendingOrder): PendingOrder {
-  const subtotal = order.items.reduce(
-    (sum, item) =>
-      sum +
-      getLineTotal(
-        item.product,
-        item.options,
-        item.quantity,
-        item.discountPercent,
-      ),
-    0,
-  );
-  return { ...order, ...getOrderTotals(subtotal, order.seniorPwd) };
-}
-
-function updatePendingOrder(
-  state: CartState,
-  orderId: string,
-  update: (order: PendingOrder) => PendingOrder,
-): CartState {
-  return {
-    ...state,
-    pendingOrders: state.pendingOrders.map((order) =>
-      order.id === orderId ? recalculatePendingOrder(update(order)) : order,
-    ),
-  };
-}
-
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD": {
@@ -152,7 +82,6 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ? `${makeCartKey(action.product.product_id, action.options)}::${uniqueSuffix()}`
         : makeCartKey(action.product.product_id);
       const existing = state.items[key];
-      const quantity = (existing?.quantity || 0) + 1;
       return {
         ...state,
         items: {
@@ -160,16 +89,15 @@ function cartReducer(state: CartState, action: CartAction): CartState {
           [key]: {
             key,
             product: action.product,
-            quantity,
+            quantity: (existing?.quantity || 0) + 1,
             options: action.options,
           },
         },
       };
     }
     case "ADD_CUSTOMIZED": {
-      // One confirm from the options modal. With a promo, the promo'd drink gets
-      // its own line (quantity 1) and the remaining drinks share a plain line, so
-      // the discount can only ever land on a single drink.
+      // With a promo, the promo'd unit gets its own line (qty 1) and the rest share
+      // a plain line, so the discount can only land on a single unit.
       const count = Math.max(1, Math.floor(action.quantity));
       const base = makeCartKey(action.product.product_id, action.options);
       const items = { ...state.items };
@@ -227,10 +155,8 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
     case "EDIT_OPTIONS": {
       const { [action.oldKey]: _removed, ...rest } = state.items;
-      const newKey = makeCartKey(action.product.product_id.action.newOptions);
-      const existingAtNewKey = rest[newKey];
-      const mergedQuantity =
-        (existingAtNewKey?.quantity || 0) + action.quantity;
+      const newKey = makeCartKey(action.product.product_id, action.newOptions);
+      const mergedQuantity = (rest[newKey]?.quantity || 0) + action.quantity;
       return {
         ...state,
         items: {
@@ -250,91 +176,62 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     case "SET_SENIOR_PWD":
       return { ...state, seniorPwd: action.enabled };
     case "CLEAR":
-      return { ...state, items: {}, orderType: "Dine In", seniorPwd: false };
-    case "PLACE_ORDER":
-      return {
-        ...state,
-        items: {},
-        orderType: "Dine In",
-        seniorPwd: false,
-        pendingOrders: [action.order, ...state.pendingOrders],
-      };
-    case "CHANGE_PENDING_ITEM_QUANTITY":
-      return updatePendingOrder(state, action.orderId, (order) => ({
-        ...order,
-        items: order.items.map((item) =>
-          item.key === action.key
-            ? { ...item, quantity: Math.max(1, item.quantity + action.delta) }
-            : item,
-        ),
-      }));
-    case "REMOVE_PENDING_ITEM": {
-      const updatedState = updatePendingOrder(
-        state,
-        action.orderId,
-        (order) => ({
-          ...order,
-          items: order.items.filter((item) => item.key !== action.key),
-        }),
-      );
-      return {
-        ...updatedState,
-        pendingOrders: updatedState.pendingOrders.filter(
-          (order) => order.items.length > 0,
-        ),
-      };
-    }
-    case "EDIT_PENDING_ITEM":
-      return updatePendingOrder(state, action.orderId, (order) => ({
-        ...order,
-        items: order.items.map((item) =>
-          item.key === action.key
-            ? {
-                ...item,
-                options: action.options,
-                quantity: Math.max(1, Math.floor(action.quantity)),
-                discountPercent: action.discountPercent,
-              }
-            : item,
-        ),
-      }));
-    case "COMPLETE_PENDING_ORDER":
-      return {
-        ...state,
-        pendingOrders: state.pendingOrders.filter(
-          (order) => order.id !== action.orderId,
-        ),
-        transactions: [action.transaction, ...state.transactions],
-      };
+      return { items: {}, orderType: "Dine In", seniorPwd: false };
     default:
       return state;
   }
 }
 
-// Only the orders this employee processed. The order history screen uses this so
-// one cashier never sees another cashier's orders.
-export function getTransactionsForEmployee(
-  transactions: Transaction[],
-  employeeId?: string,
-) {
-  if (!employeeId) return [];
-  return transactions.filter((t) => t.employeeId === employeeId);
+/** Cart -> POST /orders body. Ids only; the server recomputes every price. */
+export function buildOrderInput(
+  list: CartItem[],
+  orderType: OrderType,
+  seniorPwd: boolean,
+): OrderInput {
+  const items: OrderItemInput[] = list.map((line) => {
+    const discounts: NonNullable<OrderItemInput["discounts"]> = [];
+
+    if (line.discountPercent) {
+      discounts.push({
+        discount_code: PROMO_CODE_BY_PERCENT[line.discountPercent],
+        units: 1,
+      });
+    }
+    // Senior/PWD covers the units that don't already carry a promo, so the two
+    // never stack on the same unit.
+    const seniorUnits = line.quantity - (line.discountPercent ? 1 : 0);
+    if (seniorPwd && seniorUnits > 0) {
+      discounts.push({ discount_code: SENIOR_PWD_CODE, units: seniorUnits });
+    }
+
+    return {
+      product_id: line.product.product_id,
+      size_id: line.options?.sizeId ?? null,
+      quantity: line.quantity,
+      add_on_ids: line.options?.addOnIds ?? [],
+      ...(discounts.length ? { discounts } : {}),
+    };
+  });
+
+  return { order_type: ORDER_TYPE_TO_API[orderType], items };
+}
+
+function newIdempotencyKey() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 interface CartContextValue {
   items: Record<string, CartItem>;
   list: CartItem[];
-  subtotal: number; // sum of the lines, before the PWD / Senior discount
-  seniorPwdDiscount: number; // pesos off from that discount (0 when it's off)
+  subtotal: number; // client-side estimate; the server total is the source of truth
+  seniorPwdDiscount: number;
   isSeniorPwd: boolean;
-  total: number; // what the customer pays
+  total: number;
   orderType: OrderType;
-  transactions: Transaction[]; // everything processed on this device
-  myTransactions: Transaction[]; // only the logged-in cashier's orders
-  pendingOrders: PendingOrder[];
+  placing: boolean;
   dispatch: Dispatch<CartAction>;
-  placeOrder: () => void;
-  completePendingOrder: (orderId: string, paymentMode: PaymentMode) => void;
+  /** Creates a Pending order on the server and clears the cart. Throws on failure; the cart is kept. */
+  placeOrder: () => Promise<Order>;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -344,10 +241,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     items: {},
     orderType: "Dine In",
     seniorPwd: false,
-    pendingOrders: [],
-    transactions: [],
   });
-  const { user } = useAuth();
+  const [placing, setPlacing] = useState(false);
+  // Same payload retried => same key, so a dropped response can't create a duplicate order.
+  const attemptRef = useRef<{ payload: string; key: string } | null>(null);
+
   const list = Object.values(state.items);
   const { subtotal, seniorPwdDiscount, total } = getOrderTotals(
     list.reduce(
@@ -357,50 +255,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     ),
     state.seniorPwd,
   );
-  const myTransactions = getTransactionsForEmployee(
-    state.transactions,
-    user?.employee_id,
-  );
 
-  const placeOrder = () => {
-    if (list.length === 0 || !user) return;
-    const order: PendingOrder = {
-      id: uniqueSuffix(),
-      employeeId: user.employee_id,
-      cashierName: user.fullname,
-      items: list.map((item) => ({ ...item })),
-      subtotal,
-      seniorPwdDiscount,
-      seniorPwd: state.seniorPwd,
-      total,
-      orderType: state.orderType,
-      createdAt: new Date().toISOString(),
-    };
-    dispatch({ type: "PLACE_ORDER", order });
-  };
+  const placeOrder = async (): Promise<Order> => {
+    if (list.length === 0) throw new Error("The cart is empty");
 
-  const completePendingOrder = (orderId: string, paymentMode: PaymentMode) => {
-    const order = state.pendingOrders.find((pending) => pending.id === orderId);
-    if (!order || order.items.length === 0 || !user) return;
+    const input = buildOrderInput(list, state.orderType, state.seniorPwd);
+    const payload = JSON.stringify(input);
+    if (attemptRef.current?.payload !== payload) {
+      attemptRef.current = { payload, key: newIdempotencyKey() };
+    }
 
-    const transaction: Transaction = {
-      id: order.id,
-      employeeId: user.employee_id,
-      cashierName: user.fullname,
-      items: order.items,
-      subtotal: order.subtotal,
-      seniorPwdDiscount: order.seniorPwdDiscount,
-      total: order.total,
-      orderType: order.orderType,
-      paymentMode,
-      completedAt: new Date().toISOString(),
-    };
-    dispatch({ type: "COMPLETE_PENDING_ORDER", orderId, transaction });
-    recordTransaction(transaction).catch((err) => {
-      // Never fails with mock data. With a real backend, this is where you'd
-      // queue a retry or show a "couldn't sync" message.
-      console.warn("Failed to sync transaction to backend:", err);
-    });
+    setPlacing(true);
+    try {
+      const res = await createOrder(input, attemptRef.current.key);
+      attemptRef.current = null;
+      dispatch({ type: "CLEAR" });
+      return res.data;
+    } finally {
+      setPlacing(false);
+    }
   };
 
   return (
@@ -413,12 +286,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         isSeniorPwd: state.seniorPwd,
         total,
         orderType: state.orderType,
-        transactions: state.transactions,
-        myTransactions,
-        pendingOrders: state.pendingOrders,
+        placing,
         dispatch,
         placeOrder,
-        completePendingOrder,
       }}
     >
       {children}

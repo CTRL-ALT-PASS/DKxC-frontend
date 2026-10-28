@@ -39,6 +39,7 @@ export interface Order {
 export interface OrderFilters {
   status?: OrderStatus;
   order_type?: ApiOrderType;
+  employee_id?: string;
 }
 
 export interface OrderDiscountInput {
@@ -136,6 +137,43 @@ interface OrderMutation {
 }
 
 /* ------------------------------------------------------------------ */
+
+/**
+ * Server order -> PUT body. The API doesn't return discount `units`, so they are
+ * derived from the stored amount: amount = (unit_price + add-ons) x units x rate%.
+ */
+export function orderItemsToInput(order: Order): OrderItemInput[] {
+  return order.items.map((item) => {
+    const addOnTotal = item.add_ons.reduce(
+      (sum, a) => sum + parseFloat(a.price_at_purchase),
+      0,
+    );
+    const lineUnit = parseFloat(item.unit_price) + addOnTotal;
+
+    const discounts = item.discounts.map((d) => {
+      const perUnit = lineUnit * (parseFloat(d.rate_applied) / 100);
+      const units =
+        perUnit > 0 ? Math.round(parseFloat(d.amount) / perUnit) : 1;
+      return {
+        discount_code: d.discount_code,
+        units: Math.min(item.quantity, Math.max(1, units)),
+      };
+    });
+
+    return {
+      product_id: item.product_id,
+      size_id: item.size_id,
+      quantity: item.quantity,
+      add_on_ids: item.add_ons.map((a) => a.add_on_id),
+      ...(discounts.length ? { discounts } : {}),
+    };
+  });
+}
+
+/** order_date + order_time are separate strings on the API. */
+export function orderDateTime(order: Order): Date {
+  return new Date(`${order.order_date.slice(0, 10)}T${order.order_time}`);
+}
 
 export function getOrders(
   filters: OrderFilters = {},

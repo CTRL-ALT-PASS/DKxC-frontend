@@ -1,10 +1,12 @@
 import SearchBar from "@/components/shared/SearchBar";
+import { useCategories } from "@/hooks/use-categories";
 import { useProducts } from "@/hooks/use-products";
 import { useSearch } from "@/hooks/use-search";
+import { orderErrorMessage } from "@/services/ordersApi";
 import type { Product } from "@/services/productsApi";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ClipboardCheck } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -29,23 +31,6 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 
-// TODO: replace with a /categories endpoint. IDs match the seeded `category` table.
-const CATEGORY_NAMES: Record<number, string> = {
-  1: "Espresso",
-  2: "Pasta",
-  3: "Chicken Katsu Series",
-  4: "Snacks",
-  5: "Chicken Karaage",
-  6: "All-Day Breakfast",
-  7: "Fruit Tea",
-  8: "Non-Coffee",
-  9: "Matcha",
-};
-const CATEGORY_OPTIONS = ["All", ...Object.values(CATEGORY_NAMES)];
-const CATEGORY_ID_BY_NAME: Record<string, number> = Object.fromEntries(
-  Object.entries(CATEGORY_NAMES).map(([id, name]) => [name, Number(id)]),
-);
-
 // Stable reference so useProducts doesn't see a new filters object each render
 const POS_FILTERS = { product_status: "Active" } as const;
 
@@ -55,7 +40,9 @@ export default function POSScreen() {
   const { user } = useAuth();
   const [category, setCategory] = useState("All");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const { products, loading, error, refetch } = useProducts(POS_FILTERS);
+  const { categories } = useCategories();
   const {
     items,
     list,
@@ -64,11 +51,19 @@ export default function POSScreen() {
     isSeniorPwd,
     total,
     orderType,
+    placing,
     dispatch,
     placeOrder,
   } = useCart();
   const isCartEmpty = list.length === 0;
   const summaryWidth = Math.min(320, Math.max(220, Math.round(width * 0.22)));
+
+  // Stock changes as orders complete, so refresh availability when returning to this screen
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch]),
+  );
 
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -76,15 +71,23 @@ export default function POSScreen() {
     day: "numeric",
   });
 
-  const categoryFiltered = useMemo(
-    () =>
-      category === "All"
-        ? products
-        : products.filter(
-            (p) => p.category_id === CATEGORY_ID_BY_NAME[category],
-          ),
-    [products, category],
+  const categoryOptions = useMemo(
+    () => ["All", ...categories.map((c) => c.category_name)],
+    [categories],
   );
+  const categoryNameById = useMemo(
+    () =>
+      Object.fromEntries(
+        categories.map((c) => [c.category_id, c.category_name]),
+      ),
+    [categories],
+  );
+
+  const categoryFiltered = useMemo(() => {
+    if (category === "All") return products;
+    const selected = categories.find((c) => c.category_name === category);
+    return products.filter((p) => p.category_id === selected?.category_id);
+  }, [products, categories, category]);
 
   const {
     query,
@@ -96,10 +99,15 @@ export default function POSScreen() {
     dispatch({ type: "SET_ORDER_TYPE", orderType: type });
   };
 
-  const handlePlaceOrder = () => {
-    if (isCartEmpty) return;
-    placeOrder();
-    router.navigate("/pending");
+  const handlePlaceOrder = async () => {
+    if (isCartEmpty || placing) return;
+    setOrderError(null);
+    try {
+      await placeOrder();
+      router.navigate("/pending");
+    } catch (e) {
+      setOrderError(orderErrorMessage(e)); // cart is kept so the cashier can retry
+    }
   };
 
   // This route is only reachable after logging in, so user is always set here.
@@ -119,7 +127,7 @@ export default function POSScreen() {
               className="w-80 mr-4"
             />
             <CategoryDropdown
-              categories={CATEGORY_OPTIONS}
+              categories={categoryOptions}
               selected={category}
               onSelect={setCategory}
               chevronIcon={chevronIcon}
@@ -152,7 +160,7 @@ export default function POSScreen() {
               renderCard={(item) => (
                 <ProductCard
                   product={item}
-                  categoryName={CATEGORY_NAMES[item.category_id] ?? "Other"}
+                  categoryName={categoryNameById[item.category_id] ?? "Other"}
                   quantity={items[String(item.product_id)]?.quantity || 0}
                   addIcon={addIcon}
                   onIncrease={() => dispatch({ type: "ADD", product: item })}
@@ -305,21 +313,28 @@ export default function POSScreen() {
               </Text>
               <Text className="font-semibold">₱{total.toFixed(2)}</Text>
             </View>
+            {orderError && (
+              <Text className="text-xs text-warn mt-3">{orderError}</Text>
+            )}
             <Pressable
-              disabled={isCartEmpty}
+              disabled={isCartEmpty || placing}
               onPress={handlePlaceOrder}
               className={`mt-4 flex-row items-center justify-center gap-2 rounded-xl py-3 ${
-                isCartEmpty ? "bg-slate-300" : "bg-primary"
+                isCartEmpty || placing ? "bg-slate-300" : "bg-primary"
               }`}
             >
-              <ClipboardCheck
-                size={18}
-                color={isCartEmpty ? "#64748B" : "#FFFFFF"}
-              />
+              {placing ? (
+                <ActivityIndicator size="small" />
+              ) : (
+                <ClipboardCheck
+                  size={18}
+                  color={isCartEmpty ? "#64748B" : "#FFFFFF"}
+                />
+              )}
               <Text
-                className={`font-semibold ${isCartEmpty ? "text-slate-500" : "text-white"}`}
+                className={`font-semibold ${isCartEmpty || placing ? "text-slate-500" : "text-white"}`}
               >
-                Place order
+                {placing ? "Placing…" : "Place order"}
               </Text>
             </Pressable>
           </View>
