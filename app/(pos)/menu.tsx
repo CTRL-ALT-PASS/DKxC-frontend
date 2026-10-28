@@ -1,5 +1,7 @@
 import SearchBar from "@/components/shared/SearchBar";
 import { useSearch } from "@/hooks/use-search";
+import { useRouter } from "expo-router";
+import { ClipboardCheck } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
   Pressable,
@@ -12,7 +14,6 @@ import addIcon from "../../assets/icons/basket-add.png";
 import chevronIcon from "../../assets/icons/chevron-down.png";
 import CategoryDropdown from "../../components/CategoryDropdown";
 import Header from "../../components/Header";
-import PaymentModeModal from "../../components/PaymentModeModal";
 import ProductCard from "../../components/ProductCard";
 import ProductOptionsModal from "../../components/ProductOptionsModal";
 import ProductGrid from "../../components/shared/ProductGrid";
@@ -24,10 +25,11 @@ import {
   SENIOR_PWD_DISCOUNT_PERCENT,
 } from "../../constants/pricing";
 import { useAuth } from "../../context/AuthContext";
-import { useCart, type PaymentMode } from "../../context/CartContext";
+import { useCart } from "../../context/CartContext";
 import { useProducts } from "../../hooks/use-products";
 
 export default function POSScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const { user } = useAuth();
   const {
@@ -38,7 +40,6 @@ export default function POSScreen() {
   } = useProducts();
   const [category, setCategory] = useState("All");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const {
     items,
     list,
@@ -48,7 +49,7 @@ export default function POSScreen() {
     total,
     orderType,
     dispatch,
-    completeTransaction,
+    placeOrder,
   } = useCart();
   const isCartEmpty = list.length === 0;
   const summaryWidth = Math.min(320, Math.max(220, Math.round(width * 0.22)));
@@ -72,14 +73,12 @@ export default function POSScreen() {
 
   const chooseOrderType = (type: "Dine In" | "Take out") => {
     dispatch({ type: "SET_ORDER_TYPE", orderType: type });
-    if (!isCartEmpty) {
-      setPaymentModalOpen(true);
-    }
   };
 
-  const handlePaymentConfirm = (mode: PaymentMode) => {
-    completeTransaction(mode);
-    setPaymentModalOpen(false);
+  const handlePlaceOrder = () => {
+    if (isCartEmpty) return;
+    placeOrder();
+    router.navigate("/pending");
   };
 
   // This route is only reachable after logging in, so user is always set here.
@@ -134,7 +133,7 @@ export default function POSScreen() {
           style={{ width: summaryWidth }}
           className="bg-white p-6 border-l border-slate-200"
         >
-          <Text className="text-lg font-semibold text-darcy mb-4">Summary</Text>
+          <Text className="text-lg font-semibold text-secondary mb-4">Summary</Text>
           {list.map((entry) => (
             <View
               key={entry.key}
@@ -150,7 +149,7 @@ export default function POSScreen() {
                   </Text>
                 )}
                 {!!entry.discountPercent && (
-                  <Text className="text-xs text-darcy font-medium">
+                  <Text className="text-xs text-primary font-medium">
                     {formatPromo(
                       entry.product,
                       entry.options,
@@ -192,7 +191,7 @@ export default function POSScreen() {
                 onValueChange={(enabled) =>
                   dispatch({ type: "SET_SENIOR_PWD", enabled })
                 }
-                trackColor={{ false: "#CBD5E1", true: "#1F3D2B" }}
+                trackColor={{ false: "#CBD5E1", true: "#BE185D" }}
                 thumbColor="#FFFFFF"
               />
             </View>
@@ -202,12 +201,12 @@ export default function POSScreen() {
                 onPress={() => chooseOrderType("Dine In")}
                 className={`flex-1 py-2 rounded-xl items-center justify-center ${
                   orderType === "Dine In"
-                    ? "bg-darcy"
-                    : "bg-white border border-darcy"
+                    ? "bg-primary"
+                    : "bg-white border border-primary"
                 }`}
               >
                 <Text
-                  className={`text-sm font-semibold ${orderType === "Dine In" ? "text-white" : "text-darcy"}`}
+                  className={`text-sm font-semibold ${orderType === "Dine In" ? "text-white" : "text-secondary"}`}
                   numberOfLines={1}
                 >
                   Dine In
@@ -217,12 +216,12 @@ export default function POSScreen() {
                 onPress={() => chooseOrderType("Take out")}
                 className={`flex-1 py-2 rounded-xl items-center justify-center ${
                   orderType === "Take out"
-                    ? "bg-darcy"
-                    : "bg-white border border-darcy"
+                    ? "bg-primary"
+                    : "bg-white border border-primary"
                 }`}
               >
                 <Text
-                  className={`text-sm font-semibold ${orderType === "Take out" ? "text-white" : "text-darcy"}`}
+                  className={`text-sm font-semibold ${orderType === "Take out" ? "text-white" : "text-secondary"}`}
                   numberOfLines={1}
                 >
                   Take out
@@ -251,10 +250,10 @@ export default function POSScreen() {
                   </Text>
                 </View>
                 <View className="flex-row justify-between mb-2">
-                  <Text className="text-sm text-darcy font-medium">
+                  <Text className="text-sm text-primary font-medium">
                     PWD / Senior ({SENIOR_PWD_DISCOUNT_PERCENT}%)
                   </Text>
-                  <Text className="text-sm text-darcy font-medium">
+                  <Text className="text-sm text-primary font-medium">
                     −₱{seniorPwdDiscount.toFixed(2)}
                   </Text>
                 </View>
@@ -267,6 +266,23 @@ export default function POSScreen() {
               </Text>
               <Text className="font-semibold">₱{total.toFixed(2)}</Text>
             </View>
+            <Pressable
+              disabled={isCartEmpty}
+              onPress={handlePlaceOrder}
+              className={`mt-4 flex-row items-center justify-center gap-2 rounded-xl py-3 ${
+                isCartEmpty ? "bg-slate-300" : "bg-primary"
+              }`}
+            >
+              <ClipboardCheck
+                size={18}
+                color={isCartEmpty ? "#64748B" : "#FFFFFF"}
+              />
+              <Text
+                className={`font-semibold ${isCartEmpty ? "text-slate-500" : "text-white"}`}
+              >
+                Place order
+              </Text>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -288,12 +304,6 @@ export default function POSScreen() {
         }
       />
 
-      <PaymentModeModal
-        visible={paymentModalOpen}
-        total={total}
-        onClose={() => setPaymentModalOpen(false)}
-        onConfirm={handlePaymentConfirm}
-      />
     </View>
   );
 }

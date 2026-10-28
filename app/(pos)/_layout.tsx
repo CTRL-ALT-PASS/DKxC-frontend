@@ -22,6 +22,7 @@ export default function TabsLayout() {
   const navItems = [
     {
       key: "order",
+      label: "Order",
       icon: LayoutGrid,
       title: "Menu",
       label: "Menu",
@@ -30,6 +31,7 @@ export default function TabsLayout() {
     },
     {
       key: "pending",
+      label: "Pending",
       icon: Clock,
       title: "Pending Orders",
       label: "Pending Orders",
@@ -38,6 +40,7 @@ export default function TabsLayout() {
     },
     {
       key: "history",
+      label: "History",
       icon: History,
       title: "History",
       label: "History",   

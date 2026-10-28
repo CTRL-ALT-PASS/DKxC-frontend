@@ -20,6 +20,8 @@ interface ProductOptionsModalProps {
   onClose: () => void;
   onConfirm: (result: ProductOptionsResult) => void;
   initialOptions?: Record<string, string>;
+  initialQuantity?: number;
+  initialDiscountPercent?: number;
   confirmLabel?: string;
 }
 
@@ -48,7 +50,7 @@ function Pill({
     <Pressable
       onPress={onPress}
       className={`px-4 py-2 rounded-full border ${
-        selected ? "bg-darcy border-darcy" : "bg-white border-slate-300"
+        selected ? "bg-primary border-primary" : "bg-white border-slate-300"
       }`}
     >
       <Text className={selected ? "text-white" : "text-slate-700"}>
@@ -64,6 +66,8 @@ export default function ProductOptionsModal({
   onClose,
   onConfirm,
   initialOptions,
+  initialQuantity = 1,
+  initialDiscountPercent,
   confirmLabel = "Confirm",
 }: ProductOptionsModalProps) {
   // Lazy initializers run once per mount. The parent remounts this component
@@ -72,9 +76,9 @@ export default function ProductOptionsModal({
   const [selections, setSelections] = useState<Record<string, string>>(() =>
     getDefaultSelections(product, initialOptions),
   );
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(initialQuantity);
   const [discountPercent, setDiscountPercent] = useState<number | undefined>(
-    undefined,
+    initialDiscountPercent,
   );
 
   if (!product) return null;
@@ -91,7 +95,7 @@ export default function ProductOptionsModal({
       onRequestClose={onClose}
     >
       <View className="flex-1 bg-black/40 items-center justify-center px-6">
-        <View className="bg-cream rounded-3xl p-6 w-full max-w-lg">
+        <View className="bg-neutral rounded-3xl p-6 w-full max-w-lg">
           {/* Close button sits in the upper-right corner of the card */}
           <Pressable
             onPress={onClose}
@@ -101,7 +105,7 @@ export default function ProductOptionsModal({
             <Text className="text-2xl text-slate-700">×</Text>
           </Pressable>
 
-          <Text className="text-2xl font-semibold text-darcy text-center mb-1 mt-2">
+          <Text className="text-2xl font-semibold text-secondary text-center mb-1 mt-2">
             {product.name}
           </Text>
           <Text className="text-center text-slate-500 mb-6">
@@ -191,7 +195,7 @@ export default function ProductOptionsModal({
               <Text className="text-sm text-slate-500">
                 {discountPercent}% promo (1 drink)
               </Text>
-              <Text className="text-sm text-darcy font-medium">
+              <Text className="text-sm text-primary font-medium">
                 −₱{discountAmount.toFixed(2)}
               </Text>
             </View>
@@ -202,7 +206,7 @@ export default function ProductOptionsModal({
               onConfirm({ options: selections, quantity, discountPercent });
               onClose();
             }}
-            className="bg-darcy rounded-xl py-4 items-center mt-1"
+            className="bg-primary rounded-xl py-4 items-center mt-1"
           >
             <Text className="text-white text-lg font-semibold">
               {confirmLabel} — ₱{total.toFixed(2)}
