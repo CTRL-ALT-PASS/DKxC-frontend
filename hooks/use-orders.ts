@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-    cancelOrder,
-    completeOrder,
-    getOrders,
-    updateOrder,
-    type CompleteResult,
-    type Order,
-    type OrderFilters,
-    type OrderInput,
+  cancelOrder,
+  completeOrder,
+  getOrders,
+  updateOrder,
+  type CompleteResult,
+  type Order,
+  type OrderFilters,
+  type OrderInput,
 } from "@/services/ordersApi";
 
 function toError(e: unknown): Error {
@@ -48,16 +48,19 @@ export function useOrders(filters: OrderFilters = {}) {
   }, [refetch]);
 
   // Mutations throw so screens can show the server message (422 stock shortages, 409 conflicts).
-  const update = useCallback(async (id: number, input: OrderInput) => {
-    setSaving(true);
-    try {
-      const res = await updateOrder(id, input);
-      setOrders((prev) => prev.map((o) => (o.order_id === id ? res.data : o)));
-      return res.data;
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+  const update = useCallback(
+    async (id: number, input: OrderInput) => {
+      setSaving(true);
+      try {
+        const res = await updateOrder(id, input);
+        await refetch(); // PUT response isn't a reliable full Order
+        return res.data;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [refetch],
+  );
 
   const complete = useCallback(
     async (id: number): Promise<CompleteResult> => {

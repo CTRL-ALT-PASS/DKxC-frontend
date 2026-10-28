@@ -244,11 +244,19 @@ export function cancelOrder(
 /** One readable message for a failed order call (422 field errors, 409/403 messages, network errors). */
 export function orderErrorMessage(e: unknown): string {
   if (e instanceof ApiError) {
+    const shortages = e.data?.shortages as
+      | { item_name: string; shortage_quantity: string; base_unit: string }[]
+      | undefined;
+    if (shortages?.length) {
+      return `${e.message} Short: ${shortages
+        .map(
+          (s) =>
+            `${s.item_name} (${Number(s.shortage_quantity)} ${s.base_unit})`,
+        )
+        .join(", ")}`;
+    }
     const first = Object.values(e.errors ?? {})[0]?.[0];
     return first ?? e.message;
   }
   return e instanceof Error ? e.message : "Something went wrong";
 }
-
-export { ApiError };
-

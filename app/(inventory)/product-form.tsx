@@ -152,7 +152,7 @@ export default function ProductFormRoute() {
           addOns={addOnOptions}
           onSave={handleSave}
           onDelete={isEdit ? handleDelete : undefined}
-          onCancel={() => router.replace("/(inventory)/products)")}
+          onCancel={() => router.replace("/(inventory)/products")}
         />
       )}
     </>

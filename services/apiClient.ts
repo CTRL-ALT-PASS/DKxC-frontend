@@ -5,27 +5,36 @@ export class ApiError extends Error {
   status: number;
   code?: string;
   errors?: Record<string, string[]>;
+  /** Full parsed response body, e.g. `shortages` on a 422 from /orders/{id}/complete */
+  data?: any;
 
   constructor(
     status: number,
     message: string,
-    options?: { code?: string; errors?: Record<string, string[]> },
+    options?: {
+      code?: string;
+      errors?: Record<string, string[]>;
+      data?: any;
+    },
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = options?.code;
     this.errors = options?.errors;
+    this.data = options?.data;
   }
 }
 
 type Query = Record<string, string | number | undefined | null>;
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   query?: Query;
   signal?: AbortSignal;
+  /** Extra headers, e.g. `Idempotency-Key`. Merged last, but can't override Authorization. */
+  headers?: Record<string, string>;
 }
 
 function buildUrl(path: string, query?: Query): string {
@@ -44,13 +53,23 @@ function buildUrl(path: string, query?: Query): string {
 
 export async function request<T>(
   path: string,
-  { method = "GET", body, query, signal }: RequestOptions = {},
+  {
+    method = "GET",
+    body,
+    query,
+    signal,
+    headers: extraHeaders,
+  }: RequestOptions = {},
 ): Promise<T> {
   const token = await getAuthToken();
 
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    ...extraHeaders,
+  };
   if (body !== undefined) headers["Content-Type"] = "application/json";
+  // Set last so a caller can never override the session token
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const response = await fetch(buildUrl(path, query), {
     method,
@@ -74,7 +93,7 @@ export async function request<T>(
     throw new ApiError(
       response.status,
       payload?.message ?? `Request failed (${response.status})`,
-      { code: payload?.code, errors: payload?.errors },
+      { code: payload?.code, errors: payload?.errors, data: payload },
     );
   }
 
