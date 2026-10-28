@@ -1,3 +1,4 @@
+import type { DailySeriesPoint } from "@/services/dashboardApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { X } from "lucide-react-native";
 import { useMemo, useState } from "react";
@@ -22,6 +23,7 @@ import { buildSeries, niceMax, type DateRange, type Metric } from "./chartData";
 interface ChartModalProps {
   metric: Metric | null;
   range: DateRange;
+  series: DailySeriesPoint[];
   onClose: () => void;
 }
 
@@ -130,13 +132,14 @@ function LineChart({
 export default function ChartModal({
   metric,
   range,
+  series,
   onClose,
 }: ChartModalProps) {
   const [viewportWidth, setViewportWidth] = useState(0);
 
   const data = useMemo(
-    () => (metric ? buildSeries(metric, range) : []),
-    [metric, range],
+    () => (metric ? buildSeries(metric, range, series) : []),
+    [metric, range, series],
   );
 
   const total = useMemo(
@@ -168,12 +171,7 @@ export default function ChartModal({
   const needsScroll = slotWidth * data.length > viewportWidth + 1;
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable
         className="flex-1 items-center justify-center bg-canvas/60 px-6"
         onPress={onClose}

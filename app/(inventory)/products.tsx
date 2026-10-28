@@ -1,3 +1,4 @@
+import ManageAddOns from "@/components/inventory/products/ManageAddOns";
 import ProductGrid from "@/components/shared/ProductGrid";
 import SearchBar from "@/components/shared/SearchBar";
 import { useProducts } from "@/hooks/use-products";
@@ -16,6 +17,8 @@ import {
   View,
 } from "react-native";
 import InventoryProductCard from "../../components/inventory/products/InventoryProductCard";
+import ManageCategories from "../../components/inventory/products/ManageCategories";
+import { useAddOns } from "../../hooks/use-add-ons";
 import { useCategories } from "../../hooks/use-categories";
 
 const PRODUCT_FORM_ROUTE = "/(inventory)/product-form";
@@ -28,7 +31,11 @@ export default function ProductsScreen() {
   const router = useRouter();
   const [categoryId, setCategoryId] = useState<number | null>(null); // null = All
 
-  const { categories } = useCategories();
+  const { categories, refetch: refetchCategories } = useCategories();
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
+
+  const { addOns, refetch: refetchAddOns } = useAddOns();
+  const [manageAddOnsOpen, setManageAddOnsOpen] = useState(false);
 
   const filters = useMemo(
     () => (categoryId === null ? {} : { category_id: categoryId }),
@@ -98,8 +105,10 @@ export default function ProductsScreen() {
   const openAddProduct = () => router.push(PRODUCT_FORM_ROUTE as any);
   const openEditProduct = (id: string) =>
     router.push({ pathname: PRODUCT_FORM_ROUTE as any, params: { id } });
+
   const openManageAddOns = () => {
-    // TODO: navigate to the add-ons management screen once it exists
+    refetchAddOns(); // pick up any category changes made since the last open
+    setManageAddOnsOpen(true);
   };
 
   const showInitialSpinner = loading && products.length === 0;
@@ -176,7 +185,10 @@ export default function ProductsScreen() {
             <Text className="text-white font-medium ml-2">Add product</Text>
           </Pressable>
 
-          <Pressable className="flex-row items-center bg-white border border-primary rounded-lg px-4 py-2 mr-3">
+          <Pressable
+            onPress={() => setManageCategoriesOpen(true)}
+            className="flex-row items-center bg-white border border-primary rounded-lg px-4 py-2 mr-3"
+          >
             <Pencil size={18} color={PRIMARY} />
             <Text className="text-primary font-medium ml-2">
               Edit categories
@@ -228,6 +240,23 @@ export default function ProductsScreen() {
           />
         )}
       </View>
+      <ManageCategories
+        visible={manageCategoriesOpen}
+        categories={categories}
+        onClose={() => setManageCategoriesOpen(false)}
+        onChanged={() => refetchCategories()}
+        onDeleted={(id) => {
+          if (categoryId === id) setCategoryId(null); // don't keep filtering by a deleted category
+        }}
+      />
+      {manageAddOnsOpen && (
+        <ManageAddOns
+          addOns={addOns}
+          categories={categories}
+          onClose={() => setManageAddOnsOpen(false)}
+          onChanged={() => refetchAddOns()}
+        />
+      )}
     </View>
   );
 }

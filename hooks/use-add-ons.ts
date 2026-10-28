@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { getAddOns, type AddOn } from "@/services/addOnsApi";
 
@@ -7,22 +7,25 @@ export function useAddOns() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    getAddOns({}, controller.signal)
-      .then(setAddOns)
-      .catch((e) => {
-        if (!(e instanceof Error && e.name === "AbortError")) {
-          setError(
-            e instanceof Error ? e : new Error("Failed to load add-ons"),
-          );
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
+  const refetch = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setError(null);
+    try {
+      setAddOns(await getAddOns({}, signal));
+    } catch (e) {
+      if (!(e instanceof Error && e.name === "AbortError")) {
+        setError(e instanceof Error ? e : new Error("Failed to load add-ons"));
+      }
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
   }, []);
 
-  return { addOns, loading, error };
+  useEffect(() => {
+    const controller = new AbortController();
+    refetch(controller.signal);
+    return () => controller.abort();
+  }, [refetch]);
+
+  return { addOns, loading, error, refetch };
 }
