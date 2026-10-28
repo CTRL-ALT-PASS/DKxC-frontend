@@ -17,7 +17,7 @@ import Header from "../../components/Header";
 import ProductCard from "../../components/ProductCard";
 import ProductOptionsModal from "../../components/ProductOptionsModal";
 import ProductGrid from "../../components/shared/ProductGrid";
-import type { Product } from "../../constants/mockData";
+import { CATEGORIES, PRODUCTS, type Product } from "../../constants/mockData";
 import {
   formatOptions,
   formatPromo,
@@ -26,18 +26,11 @@ import {
 } from "../../constants/pricing";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
-import { useProducts } from "../../hooks/use-products";
 
 export default function POSScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { user } = useAuth();
-  const {
-    products,
-    categories,
-    loading: loadingMenu,
-    error: menuError,
-  } = useProducts();
   const [category, setCategory] = useState("All");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const {
@@ -61,8 +54,8 @@ export default function POSScreen() {
   });
 
   const categoryFiltered = useMemo(
-    () => products.filter((p) => category === "All" || p.category === category),
-    [category, products],
+    () => PRODUCTS.filter((p) => category === "All" || p.category === category),
+    [category],
   );
 
   const {
@@ -98,17 +91,15 @@ export default function POSScreen() {
               className="w-80 mr-4"
             />
             <CategoryDropdown
-              categories={categories}
+              categories={CATEGORIES}
               selected={category}
               onSelect={setCategory}
               chevronIcon={chevronIcon}
             />
           </View>
 
-          {loadingMenu ? (
-            <Text className="text-slate-400 mt-6">Loading menu...</Text>
-          ) : menuError ? (
-            <Text className="text-warn mt-6">{menuError}</Text>
+          {filtered.length === 0 ? (
+            <Text className="text-slate-400 mt-6">No products found.</Text>
           ) : (
             <ProductGrid
               data={filtered}
@@ -133,7 +124,9 @@ export default function POSScreen() {
           style={{ width: summaryWidth }}
           className="bg-white p-6 border-l border-slate-200"
         >
-          <Text className="text-lg font-semibold text-secondary mb-4">Summary</Text>
+          <Text className="text-lg font-semibold text-secondary mb-4">
+            Summary
+          </Text>
           {list.map((entry) => (
             <View
               key={entry.key}
@@ -303,7 +296,6 @@ export default function POSScreen() {
           })
         }
       />
-
     </View>
   );
 }

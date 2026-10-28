@@ -20,7 +20,7 @@ import {
   Text,
   TextInput,
   UIManager,
-  View
+  View,
 } from "react-native";
 
 // Old architecture needs this flag for LayoutAnimation on Android (no-op on new arch).
@@ -638,7 +638,7 @@ function SizesSection({
                 onToggle(v);
               }}
               trackColor={{ false: "#d4d4d4", true: ROSE }}
-              thumbColor="#fff"
+              thumbColor="#be123c"
             />
           </View>
         }
@@ -740,7 +740,7 @@ function AddOnsSection({
                   value={enabled}
                   onValueChange={(v) => onToggle(a.id, v)}
                   trackColor={{ false: "#d4d4d4", true: ROSE }}
-                  thumbColor="#fff"
+                  thumbColor="#be123c"
                 />
               </View>
             );

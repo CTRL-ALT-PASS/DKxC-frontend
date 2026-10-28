@@ -1,21 +1,22 @@
 import BestSelling from "@/components/inventory/dashboard/BestSelling";
-import ChartModal from "@/components/inventory/dashboard/ChartModal";
-import DateRangeSelector from "@/components/inventory/dashboard/DateRangeSelector";
-import InventoryStatCards from "@/components/inventory/dashboard/InventoryStatCards";
-import PrinterConfigModal from "@/components/inventory/dashboard/PrinterConfigModal";
-import PrinterNotification from "@/components/inventory/dashboard/PrinterNotification";
-import StatsCards from "@/components/inventory/dashboard/StatsCards";
-import StockNotification from "@/components/inventory/dashboard/StockNotification";
 import {
   quickRange,
   type DateRange,
-  type Metric
+  type Metric,
 } from "@/components/inventory/dashboard/chartData";
+import ChartModal from "@/components/inventory/dashboard/ChartModal";
+import DateRangeSelector from "@/components/inventory/dashboard/DateRangeSelector";
+import InventoryStatCards from "@/components/inventory/dashboard/InventoryStatCards";
 import {
   DEFAULT_PRINTER_CONFIG,
   type PrinterConfig,
 } from "@/components/inventory/dashboard/printerConfig";
+import PrinterConfigModal from "@/components/inventory/dashboard/PrinterConfigModal";
+import PrinterNotification from "@/components/inventory/dashboard/PrinterNotification";
+import StatsCards from "@/components/inventory/dashboard/StatsCards";
+import StockNotification from "@/components/inventory/dashboard/StockNotification";
 import { useDashboard } from "@/hooks/use-dashboard";
+import { DailySeriesPoint } from "@/services/dashboardApi";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 

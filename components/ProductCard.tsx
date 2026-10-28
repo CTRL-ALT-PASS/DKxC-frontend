@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { ImageSourcePropType, Pressable, Text, View } from "react-native";
 import QuantityStepper from "./QuantityStepper";
 import MarqueeBadge from "./inventory/products/MarqueeBadge";
-import { PRODUCT_CARD_WIDTH } from "./shared/ProductGrid"; // adjust path if needed
+import { PRODUCT_CARD_WIDTH } from "./shared/ProductGrid";
 
 interface ProductCardProps {
   product: Product;
@@ -23,9 +23,14 @@ export default function ProductCard({
   onOpenSpecs,
 }: ProductCardProps) {
   const hasSpecs = !!product.specs?.length;
+  const available = product.available !== false;
 
   return (
-    <Pressable onPress={hasSpecs ? onOpenSpecs : onIncrease}>
+    <Pressable
+      onPress={hasSpecs ? onOpenSpecs : onIncrease}
+      disabled={!available}
+      style={{ opacity: available ? 1 : 0.5 }}
+    >
       <View
         style={{ width: PRODUCT_CARD_WIDTH }}
         className="bg-white rounded-2xl p-3"
@@ -44,7 +49,7 @@ export default function ProductCard({
         <Text className="text-slate-500 mb-2">₱{product.price.toFixed(2)}</Text>
         <View className="flex-row items-center justify-between">
           <MarqueeBadge label={product.category} />
-          {(hasSpecs || quantity === 0) && (
+          {available && (hasSpecs || quantity === 0) && (
             <Image
               source={addIcon}
               style={{ width: 15, height: 20 }}
@@ -52,7 +57,7 @@ export default function ProductCard({
             />
           )}
         </View>
-        {!hasSpecs && quantity > 0 && (
+        {available && !hasSpecs && quantity > 0 && (
           <QuantityStepper
             quantity={quantity}
             onIncrease={onIncrease}
