@@ -30,7 +30,7 @@ export default function TransactionHistoryScreen() {
         // chevronIcon={chevronIcon}
       />
 
-      <ScrollView className="flex-1 p-6">
+      <ScrollView className="flex-1 p-4">
         {myTransactions.length === 0 && (
           <Text className="text-slate-400 text-center mt-12">
             You haven&apos;t processed any orders yet.
@@ -38,7 +38,7 @@ export default function TransactionHistoryScreen() {
         )}
 
         {myTransactions.map((tx) => (
-          <View key={tx.id} className="bg-white rounded-2xl p-5 mb-4 max-w-xl">
+          <View key={tx.id} className="w-full bg-white rounded-2xl p-4 mb-3">
             <View className="flex-row justify-between items-center mb-3">
               <Text className="font-semibold text-secondary">
                 {new Date(tx.completedAt).toLocaleString("en-US", {
