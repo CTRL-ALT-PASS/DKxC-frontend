@@ -1,3 +1,4 @@
+import type { DailySeriesPoint } from "@/services/dashboardApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { ArrowUpRight } from "lucide-react-native";
 import { useMemo } from "react";
@@ -14,6 +15,7 @@ interface StatsCardsProps {
   grossSales: number;
   grossProfit: number;
   range: DateRange;
+  series: DailySeriesPoint[];
   onExpand: (metric: Metric) => void;
 }
 
@@ -39,14 +41,15 @@ export default function StatsCards({
   grossSales,
   grossProfit,
   range,
+  series: daily,
   onExpand,
 }: StatsCardsProps) {
   const series = useMemo(
     () => ({
-      sales: buildSeries("sales", range).map((p) => p.value),
-      profit: buildSeries("profit", range).map((p) => p.value),
+      sales: buildSeries("sales", range, daily).map((p) => p.value),
+      profit: buildSeries("profit", range, daily).map((p) => p.value),
     }),
-    [range],
+    [range, daily],
   );
 
   const amounts: Record<Metric, number> = {
@@ -72,7 +75,9 @@ export default function StatsCards({
   };
 
   return (
-    <View className="flex-row gap-4">
+    // flex-1 lets the row take whatever height the parent gives it;
+    // the cards then stretch to match each other.
+    <View className="flex-1 flex-row gap-4">
       {CARDS.map((card) => {
         const change = halfOverHalfChange(series[card.metric]);
         const up = change >= 0;
@@ -90,7 +95,7 @@ export default function StatsCards({
               colors={["#4C0519", "#2A030F"]} // secondary -> canvas.mid
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={{ padding: 20, minHeight: 210 }}
+              style={{ padding: 20, flex: 1, minHeight: 210 }}
             >
               <View className="flex-row items-start justify-between">
                 <View>
@@ -122,10 +127,11 @@ export default function StatsCards({
                 </Text>
               </View>
 
-              <View className="mt-2">
+              {/* The chart takes all remaining height in the card */}
+              <View className="mt-2 flex-1">
                 <SparkLine
                   values={series[card.metric]}
-                  height={72}
+                  fill
                   gradientId={`spark-${card.metric}`}
                 />
               </View>

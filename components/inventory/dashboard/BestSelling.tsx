@@ -5,22 +5,14 @@ interface RankedItem {
   value: number;
 }
 
-// Mock data — replace with real aggregation later, and swap this
-// layout for a pie chart when that's ready.
-const BEST_SELLING_PRODUCTS: RankedItem[] = [
-  { name: "Green Matcha Latte", value: 500 },
-  { name: "Salted Caramel Frappe", value: 300 },
-  { name: "Croissant", value: 200 },
-];
-
-const BEST_SELLING_CATEGORIES: RankedItem[] = [
-  { name: "Coffee", value: 800 },
-  { name: "Pastries", value: 200 },
-  { name: "Fruit tea", value: 200 },
-];
-
 // canvas -> secondary -> secondary at 70%, dark to light like the mockup
 const RANK_TINTS = ["#1A0208", "#4C0519", "#4C0519B3"];
+
+const formatPeso = (n: number) =>
+  "₱" +
+  Math.round(n)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
 function RankedList({
   title,
@@ -34,7 +26,8 @@ function RankedList({
   onActionPress?: () => void;
 }) {
   return (
-    <View>
+    // flex-1: both lists split the card's height equally
+    <View className="flex-1">
       <View className="flex-row items-center justify-between">
         <Text className="text-sm font-bold text-secondary">{title}</Text>
         {actionLabel && (
@@ -46,11 +39,21 @@ function RankedList({
         )}
       </View>
 
-      <View className="mt-3">
+      {/* Rows share the list's height evenly; minHeight keeps them
+          readable when there's no spare space (e.g. a short screen). */}
+      <View className="mt-3 flex-1">
+        {items.length === 0 && (
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-sm text-secondary/60">
+              No sales in this range
+            </Text>
+          </View>
+        )}
         {items.map((item, index) => (
           <View
             key={item.name}
-            className={`flex-row items-center gap-3 py-2.5 ${
+            style={{ minHeight: 44 }}
+            className={`flex-1 flex-row items-center gap-3 ${
               index !== items.length - 1
                 ? "border-b border-tertiary-soft/30"
                 : ""
@@ -66,7 +69,7 @@ function RankedList({
               {item.name}
             </Text>
             <Text className="text-sm font-semibold text-secondary">
-              ₱{item.value}
+              {formatPeso(item.value)}
             </Text>
           </View>
         ))}
@@ -76,19 +79,23 @@ function RankedList({
 }
 
 interface BestSellingProps {
+  products: RankedItem[]; // value = revenue
+  categories: RankedItem[];
   onViewAllPress?: () => void;
   onBreakdownPress?: () => void;
 }
 
 export default function BestSelling({
+  products,
+  categories,
   onViewAllPress,
   onBreakdownPress,
 }: BestSellingProps) {
   return (
-    <View className="rounded-3xl border border-tertiary-soft/40 bg-white p-5 shadow-sm">
+    <View className="flex-1 rounded-3xl border border-tertiary-soft/40 bg-white p-5 shadow-sm">
       <RankedList
         title="Best Selling Products"
-        items={BEST_SELLING_PRODUCTS}
+        items={products}
         actionLabel="View All"
         onActionPress={onViewAllPress}
       />
@@ -97,7 +104,7 @@ export default function BestSelling({
 
       <RankedList
         title="Best Selling Categories"
-        items={BEST_SELLING_CATEGORIES}
+        items={categories}
         actionLabel="Breakdown"
         onActionPress={onBreakdownPress}
       />

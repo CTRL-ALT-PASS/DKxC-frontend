@@ -24,6 +24,8 @@ export default function TabsLayout() {
       key: "order",
       label: "Order",
       icon: LayoutGrid,
+      title: "Menu",
+      label: "Menu",
       isActive: pathname === "/menu",
       onPress: () => router.navigate("/menu"),
     },
@@ -31,6 +33,8 @@ export default function TabsLayout() {
       key: "pending",
       label: "Pending",
       icon: Clock,
+      title: "Pending Orders",
+      label: "Pending Orders",
       isActive: pathname === "/pending",
       onPress: () => router.navigate("/pending"),
     },
@@ -38,6 +42,8 @@ export default function TabsLayout() {
       key: "history",
       label: "History",
       icon: History,
+      title: "History",
+      label: "History",   
       isActive: pathname === "/checkout",
       onPress: () => router.navigate("/checkout"),
     },
@@ -45,7 +51,7 @@ export default function TabsLayout() {
 
   return (
     <View className="flex-1 flex-row">
-      <Sidebar navItems={navItems} onLogout={handleLogout} logo={darcyMark} />
+      <Sidebar navItems={navItems} onLogout={handleLogout} logo={darcyMark} defaultCollapsed/>
       <View className="flex-1">
         <Slot />
       </View>

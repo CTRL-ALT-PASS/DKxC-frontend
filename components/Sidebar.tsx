@@ -99,11 +99,6 @@ function SidebarItem({
             color: isActive ? COLORS.textActive : COLORS.text,
             fontSize: 14,
             fontWeight: isActive ? "600" : "400",
-            flex: collapsed ? 0 : 1,
-            width: collapsed ? 0 : undefined,
-            marginLeft: collapsed ? 0 : 12,
-            opacity: labelOpacity,
-            overflow: "hidden",
           }}
         >
           {label}

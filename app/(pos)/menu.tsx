@@ -1,9 +1,14 @@
 import SearchBar from "@/components/shared/SearchBar";
+import { useCategories } from "@/hooks/use-categories";
+import { useProducts } from "@/hooks/use-products";
 import { useSearch } from "@/hooks/use-search";
-import { useRouter } from "expo-router";
+import { orderErrorMessage } from "@/services/ordersApi";
+import type { Product } from "@/services/productsApi";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ClipboardCheck } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   Switch,
   Text,
@@ -17,7 +22,6 @@ import Header from "../../components/Header";
 import ProductCard from "../../components/ProductCard";
 import ProductOptionsModal from "../../components/ProductOptionsModal";
 import ProductGrid from "../../components/shared/ProductGrid";
-import type { Product } from "../../constants/mockData";
 import {
   formatOptions,
   formatPromo,
@@ -26,20 +30,19 @@ import {
 } from "../../constants/pricing";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
-import { useProducts } from "../../hooks/use-products";
+
+// Stable reference so useProducts doesn't see a new filters object each render
+const POS_FILTERS = { product_status: "Active" } as const;
 
 export default function POSScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { user } = useAuth();
-  const {
-    products,
-    categories,
-    loading: loadingMenu,
-    error: menuError,
-  } = useProducts();
   const [category, setCategory] = useState("All");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const { products, loading, error, refetch } = useProducts(POS_FILTERS);
+  const { categories } = useCategories();
   const {
     items,
     list,
@@ -48,11 +51,19 @@ export default function POSScreen() {
     isSeniorPwd,
     total,
     orderType,
+    placing,
     dispatch,
     placeOrder,
   } = useCart();
   const isCartEmpty = list.length === 0;
   const summaryWidth = Math.min(320, Math.max(220, Math.round(width * 0.22)));
+
+  // Stock changes as orders complete, so refresh availability when returning to this screen
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch]),
+  );
 
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -60,25 +71,43 @@ export default function POSScreen() {
     day: "numeric",
   });
 
-  const categoryFiltered = useMemo(
-    () => products.filter((p) => category === "All" || p.category === category),
-    [category, products],
+  const categoryOptions = useMemo(
+    () => ["All", ...categories.map((c) => c.category_name)],
+    [categories],
   );
+  const categoryNameById = useMemo(
+    () =>
+      Object.fromEntries(
+        categories.map((c) => [c.category_id, c.category_name]),
+      ),
+    [categories],
+  );
+
+  const categoryFiltered = useMemo(() => {
+    if (category === "All") return products;
+    const selected = categories.find((c) => c.category_name === category);
+    return products.filter((p) => p.category_id === selected?.category_id);
+  }, [products, categories, category]);
 
   const {
     query,
     setQuery,
     results: filtered,
-  } = useSearch(categoryFiltered, (p) => p.name);
+  } = useSearch(categoryFiltered, (p) => p.product_name);
 
   const chooseOrderType = (type: "Dine In" | "Take out") => {
     dispatch({ type: "SET_ORDER_TYPE", orderType: type });
   };
 
-  const handlePlaceOrder = () => {
-    if (isCartEmpty) return;
-    placeOrder();
-    router.navigate("/pending");
+  const handlePlaceOrder = async () => {
+    if (isCartEmpty || placing) return;
+    setOrderError(null);
+    try {
+      await placeOrder();
+      router.navigate("/pending");
+    } catch (e) {
+      setOrderError(orderErrorMessage(e)); // cart is kept so the cashier can retry
+    }
   };
 
   // This route is only reachable after logging in, so user is always set here.
@@ -98,30 +127,45 @@ export default function POSScreen() {
               className="w-80 mr-4"
             />
             <CategoryDropdown
-              categories={categories}
+              categories={categoryOptions}
               selected={category}
               onSelect={setCategory}
               chevronIcon={chevronIcon}
             />
           </View>
 
-          {loadingMenu ? (
-            <Text className="text-slate-400 mt-6">Loading menu...</Text>
-          ) : menuError ? (
-            <Text className="text-warn mt-6">{menuError}</Text>
+          {loading && products.length === 0 ? (
+            <View className="mt-6 items-start">
+              <ActivityIndicator />
+            </View>
+          ) : error ? (
+            <View className="mt-6">
+              <Text className="text-warn mb-2">
+                Couldn't load products: {error.message}
+              </Text>
+              <Pressable
+                onPress={refetch}
+                className="self-start rounded-xl bg-primary px-4 py-2"
+              >
+                <Text className="text-white font-semibold">Retry</Text>
+              </Pressable>
+            </View>
+          ) : filtered.length === 0 ? (
+            <Text className="text-slate-400 mt-6">No products found.</Text>
           ) : (
             <ProductGrid
               data={filtered}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => String(item.product_id)}
               extraData={items}
               renderCard={(item) => (
                 <ProductCard
                   product={item}
-                  quantity={items[item.id]?.quantity || 0}
+                  categoryName={categoryNameById[item.category_id] ?? "Other"}
+                  quantity={items[String(item.product_id)]?.quantity || 0}
                   addIcon={addIcon}
                   onIncrease={() => dispatch({ type: "ADD", product: item })}
                   onDecrease={() =>
-                    dispatch({ type: "DECREASE", key: item.id })
+                    dispatch({ type: "DECREASE", key: String(item.product_id) })
                   }
                   onOpenSpecs={() => setActiveProduct(item)}
                 />
@@ -129,11 +173,14 @@ export default function POSScreen() {
             />
           )}
         </View>
+
         <View
           style={{ width: summaryWidth }}
           className="bg-white p-6 border-l border-slate-200"
         >
-          <Text className="text-lg font-semibold text-secondary mb-4">Summary</Text>
+          <Text className="text-lg font-semibold text-secondary mb-4">
+            Summary
+          </Text>
           {list.map((entry) => (
             <View
               key={entry.key}
@@ -141,11 +188,11 @@ export default function POSScreen() {
             >
               <View className="flex-1 pr-2">
                 <Text>
-                  {entry.product.name} ({entry.quantity}x)
+                  {entry.product.product_name} ({entry.quantity}x)
                 </Text>
                 {entry.options && (
                   <Text className="text-xs text-slate-500">
-                    {formatOptions(entry.options)}
+                    {formatOptions(entry.product, entry.options)}
                   </Text>
                 )}
                 {!!entry.discountPercent && (
@@ -266,21 +313,28 @@ export default function POSScreen() {
               </Text>
               <Text className="font-semibold">₱{total.toFixed(2)}</Text>
             </View>
+            {orderError && (
+              <Text className="text-xs text-warn mt-3">{orderError}</Text>
+            )}
             <Pressable
-              disabled={isCartEmpty}
+              disabled={isCartEmpty || placing}
               onPress={handlePlaceOrder}
               className={`mt-4 flex-row items-center justify-center gap-2 rounded-xl py-3 ${
-                isCartEmpty ? "bg-slate-300" : "bg-primary"
+                isCartEmpty || placing ? "bg-slate-300" : "bg-primary"
               }`}
             >
-              <ClipboardCheck
-                size={18}
-                color={isCartEmpty ? "#64748B" : "#FFFFFF"}
-              />
+              {placing ? (
+                <ActivityIndicator size="small" />
+              ) : (
+                <ClipboardCheck
+                  size={18}
+                  color={isCartEmpty ? "#64748B" : "#FFFFFF"}
+                />
+              )}
               <Text
-                className={`font-semibold ${isCartEmpty ? "text-slate-500" : "text-white"}`}
+                className={`font-semibold ${isCartEmpty || placing ? "text-slate-500" : "text-white"}`}
               >
-                Place order
+                {placing ? "Placing…" : "Place order"}
               </Text>
             </Pressable>
           </View>
@@ -288,7 +342,7 @@ export default function POSScreen() {
       </View>
 
       <ProductOptionsModal
-        key={activeProduct?.id ?? "closed"}
+        key={activeProduct?.product_id ?? "closed"}
         product={activeProduct}
         visible={!!activeProduct}
         onClose={() => setActiveProduct(null)}
@@ -303,7 +357,6 @@ export default function POSScreen() {
           })
         }
       />
-
     </View>
   );
 }

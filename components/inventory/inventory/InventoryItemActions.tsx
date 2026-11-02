@@ -1,30 +1,31 @@
 import Button from "@/components/Button";
+import { ApiError, type BaseUnit } from "@/services/inventoryApi";
 import {
-    Check,
-    ChevronDown,
-    Info,
-    Lock,
-    Plus,
-    SlidersHorizontal,
-    Trash2,
-    X,
+  Check,
+  ChevronDown,
+  Info,
+  Lock,
+  Plus,
+  SlidersHorizontal,
+  Trash2,
+  X,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import {
-    DEFAULT_CATEGORY,
-    getCategory,
-    INVENTORY_CATEGORIES,
-    InventoryCategory,
+  DEFAULT_CATEGORY,
+  getCategory,
+  INVENTORY_CATEGORIES,
+  InventoryCategory,
 } from "../../../types/inventoryCategories";
 import { InventoryItem, StockUnit } from "./InventoryRow";
 
@@ -41,15 +42,28 @@ export type InventoryItemPatch = {
   units: StockUnit[];
 };
 
+// Base units selectable when creating an item (the API also accepts "kg" and "L").
+const BASE_UNIT_OPTIONS: BaseUnit[] = ["g", "mL", "pcs"];
+
+export type InventoryItemCreate = InventoryItemPatch & { unit: BaseUnit };
+
 type Props = {
-  item: InventoryItem | null; // null = closed
+  item: InventoryItem | null; // edit mode when set
+  adding?: boolean; // add mode when true (and no item)
   onClose: () => void;
   onSave: (id: string, patch: InventoryItemPatch) => void | Promise<void>;
+  onCreate?: (payload: InventoryItemCreate) => void | Promise<void>;
 };
 
 /* ---------- small building blocks ---------- */
 
-function Label({ children, right }: { children: string; right?: React.ReactNode }) {
+function Label({
+  children,
+  right,
+}: {
+  children: string;
+  right?: React.ReactNode;
+}) {
   return (
     <View className="flex-row items-center justify-between mb-1.5">
       <Text className="text-[12px] font-bold tracking-wider text-secondary/70">
@@ -125,7 +139,15 @@ const toNum = (s: string) => {
 
 /* ---------- modal ---------- */
 
-export default function InventoryItemActions({ item, onClose, onSave }: Props) {
+export default function InventoryItemActions({
+  item,
+  adding: addingItem = false,
+  onClose,
+  onSave,
+  onCreate,
+}: Props) {
+  const isAdd = addingItem && !item;
+  const [baseUnit, setBaseUnit] = useState<BaseUnit>(BASE_UNIT_OPTIONS[0]);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<InventoryCategory>(DEFAULT_CATEGORY);
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -134,52 +156,83 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
   const [units, setUnits] = useState<StockUnit[]>([]);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newAbbr, setNewAbbr] = useState("");
   const [newFactor, setNewFactor] = useState("");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Reset the form every time a different item is opened.
   useEffect(() => {
-    if (!item) return;
-    setName(item.itemName);
-    setCategory(getCategory(item.category).name);
+    if (item) {
+      setName(item.itemName);
+      setCategory(getCategory(item.category).name);
+      setCost(String(item.baseCost));
+      setReorder(String(item.reorderLevel ?? 0));
+      setUnits(item.units ?? []);
+    } else if (addingItem) {
+      setName("");
+      setCategory(DEFAULT_CATEGORY);
+      setCost("");
+      setReorder("0");
+      setUnits([]);
+      setBaseUnit(BASE_UNIT_OPTIONS[0]);
+    } else {
+      return;
+    }
     setCategoryOpen(false);
-    setCost(String(item.baseCost));
-    setReorder(String(item.reorderLevel ?? 0));
-    setUnits(item.units ?? []);
     setAdding(false);
     setNewName("");
-    setNewAbbr("");
     setNewFactor("");
     setSaving(false);
-  }, [item]);
+    setFormError(null);
+  }, [item, addingItem]);
 
-  if (!item) return null;
+  if (!item && !isAdd) return null;
+
+  // Base unit: locked to the item's unit when editing, chosen by the user when adding.
+  const unit = isAdd ? baseUnit : item!.unit;
+
+  // Keep custom-unit notes in sync if the base unit changes while adding.
+  const pickBaseUnit = (u: BaseUnit) => {
+    setBaseUnit(u);
+    setUnits((prev) =>
+      prev.map((x) => ({
+        ...x,
+        note: `1 ${x.name} = ${fmt(x.factor)} ${u}`,
+      })),
+    );
+  };
 
   const costNum = toNum(cost);
   const reorderNum = toNum(reorder);
   const canSave =
-    name.trim().length > 0 && costNum >= 0 && reorderNum >= 0 && !saving;
+    name.trim().length > 0 &&
+    Number.isFinite(costNum) &&
+    costNum >= 0 &&
+    Number.isFinite(reorderNum) &&
+    reorderNum >= 0 &&
+    !saving;
 
+  const trimmedNewName = newName.trim();
   const newFactorNum = toNum(newFactor);
+  // Unit names must be unique (the server has no ids) and can't repeat the base unit.
+  const isDuplicate =
+    trimmedNewName.toLowerCase() === unit.toLowerCase() ||
+    units.some((u) => u.name.toLowerCase() === trimmedNewName.toLowerCase());
   const canAddUnit =
-    newName.trim().length > 0 && newFactorNum > 0 && newAbbr.trim().length > 0;
+    trimmedNewName.length > 0 && newFactorNum > 0 && !isDuplicate;
 
   const addUnit = () => {
     if (!canAddUnit) return;
-    const abbr = newAbbr.trim();
     setUnits((prev) => [
       ...prev,
       {
-        id: `${Date.now()}`,
-        name: newName.trim(),
-        abbr,
-        note: `1 ${abbr} = ${fmt(newFactorNum)} ${item.unit}`,
+        id: trimmedNewName,
+        name: trimmedNewName,
+        note: `1 ${trimmedNewName} = ${fmt(newFactorNum)} ${unit}`,
         factor: newFactorNum,
       },
     ]);
     setNewName("");
-    setNewAbbr("");
     setNewFactor("");
     setAdding(false);
   };
@@ -187,15 +240,30 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
+    setFormError(null);
     try {
-      await onSave(item.id, {
+      const patch: InventoryItemPatch = {
         itemName: name.trim(),
         category,
         baseCost: costNum,
         reorderLevel: reorderNum,
         units,
-      });
+      };
+      if (isAdd) {
+        await onCreate?.({ ...patch, unit: baseUnit });
+      } else {
+        await onSave(item!.id, patch);
+      }
       onClose();
+    } catch (e) {
+      if (e instanceof ApiError) {
+        const firstFieldError =
+          e.fieldErrors && Object.values(e.fieldErrors)[0]?.[0];
+        setFormError(firstFieldError ?? e.message);
+      } else if (!(e instanceof Error && e.message === "SESSION_INVALID")) {
+        // SESSION_INVALID is handled by the hook (signs the user out).
+        setFormError("Something went wrong. Please try again.");
+      }
     } finally {
       setSaving(false);
     }
@@ -235,11 +303,13 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
               <SlidersHorizontal size={22} color={PINK} />
               <View className="ml-4 flex-1">
                 <Text className="text-[16px] font-semibold text-secondary">
-                  Reconfigure: {item.itemName}
+                  {isAdd ? "Add New Item" : `Reconfigure: ${item!.itemName}`}
                 </Text>
-                <Text className="text-[12px] font-semibold text-secondary/60">
-                  Item ID: #{item.id}
-                </Text>
+                {!isAdd && (
+                  <Text className="text-[12px] font-semibold text-secondary/60">
+                    Item ID: #{item!.id}
+                  </Text>
+                )}
               </View>
               <Pressable
                 onPress={onClose}
@@ -261,7 +331,9 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                   Core Item Specifications
                 </Text>
                 <Text className="text-[12px] text-secondary/60">
-                  Only Name, Base Cost &amp; Reorder Level are editable
+                  {isAdd
+                    ? "Base unit can't be changed after the item is created"
+                    : "Only Name, Category, Base Cost & Reorder Level are editable"}
                 </Text>
               </View>
 
@@ -296,7 +368,9 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                       size={18}
                       color="#6B7280"
                       style={{
-                        transform: [{ rotate: categoryOpen ? "180deg" : "0deg" }],
+                        transform: [
+                          { rotate: categoryOpen ? "180deg" : "0deg" },
+                        ],
                       }}
                     />
                   </Pressable>
@@ -342,20 +416,61 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                 <View className="flex-1 mr-3">
                   <Label
                     right={
-                      <View className="flex-row items-center">
-                        <Lock size={11} color="#6B7280" />
-                        <Text className="ml-1 text-[11px] text-secondary/60">
-                          Locked
-                        </Text>
-                      </View>
+                      isAdd ? undefined : (
+                        <View className="flex-row items-center">
+                          <Lock size={11} color="#6B7280" />
+                          <Text className="ml-1 text-[11px] text-secondary/60">
+                            Locked
+                          </Text>
+                        </View>
+                      )
                     }
                   >
-                    BASE UNIT OF DEDUCTION
+                    {isAdd
+                      ? "BASE UNIT OF DEDUCTION *"
+                      : "BASE UNIT OF DEDUCTION"}
                   </Label>
-                  <Field value={`${item.unit} (System Base Unit)`} editable={false} />
+                  {isAdd ? (
+                    <View className="h-12 flex-row items-center">
+                      {BASE_UNIT_OPTIONS.map((u, i) => {
+                        const selected = u === baseUnit;
+                        return (
+                          <Pressable
+                            key={u}
+                            onPress={() => pickBaseUnit(u)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Base unit ${u}`}
+                            className={`h-12 flex-1 items-center justify-center rounded-xl border ${
+                              i > 0 ? "ml-2" : ""
+                            } ${
+                              selected
+                                ? "border-primary bg-neutral"
+                                : "border-tertiary-soft bg-white"
+                            }`}
+                          >
+                            <Text
+                              className={`text-[15px] ${
+                                selected
+                                  ? "font-semibold text-primary"
+                                  : "text-secondary"
+                              }`}
+                            >
+                              {u}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Field
+                      value={`${unit} (System Base Unit)`}
+                      editable={false}
+                    />
+                  )}
                   <Hint>
-                    Base unit is fixed to ensure point-of-sale deduction
-                    integrity.
+                    {isAdd
+                      ? "Choose carefully: it is fixed once the item is created to keep point-of-sale deduction accurate."
+                      : "Base unit is fixed to ensure point-of-sale deduction integrity."}
                   </Hint>
                 </View>
 
@@ -365,7 +480,7 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                     value={cost}
                     onChangeText={setCost}
                     prefix="₱"
-                    suffix={`/ ${item.unit}`}
+                    suffix={`/ ${unit}`}
                     numeric
                   />
                   <Hint>Calculates real-time COGS for recipes and sales.</Hint>
@@ -378,7 +493,7 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                 <Field
                   value={reorder}
                   onChangeText={setReorder}
-                  suffix={item.unit}
+                  suffix={unit}
                   numeric
                 />
                 <Hint>
@@ -395,8 +510,7 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                   </Text>
                   <Text className="mt-1 text-[13px] text-secondary/70">
                     Define packaging, bulk purchase, and dispenser conversions
-                    mapped to{" "}
-                    <Text className="font-bold">{item.unit}</Text>.
+                    mapped to <Text className="font-bold">{unit}</Text>.
                   </Text>
                 </View>
                 <Pressable
@@ -421,21 +535,16 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                         onChangeText={setNewName}
                         placeholder="e.g. Gallon"
                       />
-                    </View>
-                    <View className="flex-1 mr-3">
-                      <Label>ABBR.</Label>
-                      <Field
-                        value={newAbbr}
-                        onChangeText={setNewAbbr}
-                        placeholder="GAL"
-                      />
+                      {isDuplicate && trimmedNewName.length > 0 && (
+                        <Hint>A unit with this name already exists.</Hint>
+                      )}
                     </View>
                     <View className="flex-[1.5]">
-                      <Label>{`1 UNIT = ? ${item.unit.toUpperCase()}`}</Label>
+                      <Label>{`1 UNIT = ? ${unit.toUpperCase()}`}</Label>
                       <Field
                         value={newFactor}
                         onChangeText={setNewFactor}
-                        suffix={item.unit}
+                        suffix={unit}
                         numeric
                         placeholder="3785"
                       />
@@ -448,8 +557,10 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                       onPress={() => setAdding(false)}
                     />
                     <View className="w-3" />
-                    <Button label="Add" onPress={addUnit} 
-                        // disabled={!canAddUnit} 
+                    <Button
+                      label="Add"
+                      onPress={addUnit}
+                      // disabled={!canAddUnit}
                     />
                   </View>
                 </View>
@@ -458,7 +569,7 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
               <View className="mt-4">
                 {units.length === 0 && !adding && (
                   <Text className="py-4 text-center text-[13px] text-secondary/60">
-                    No custom units yet. Stock is tracked in {item.unit} only.
+                    No custom units yet. Stock is tracked in {unit} only.
                   </Text>
                 )}
                 {units.map((u) => (
@@ -466,17 +577,9 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                     key={u.id}
                     className="mb-3 flex-row items-center rounded-xl border border-tertiary-soft/60 bg-white px-4 py-3"
                   >
-                    <View className="w-12 items-center">
-                      <Text className="text-[12px] font-bold text-secondary/70">
-                        {u.abbr ?? u.name.slice(0, 3).toUpperCase()}
-                      </Text>
-                    </View>
                     <View className="flex-1">
                       <Text className="text-[15px] font-semibold text-secondary">
-                        {u.name}{" "}
-                        <Text className="text-[12px] font-normal text-secondary/60">
-                          ({u.abbr ?? u.name.slice(0, 3).toUpperCase()})
-                        </Text>
+                        {u.name}
                       </Text>
                       <Text className="mt-0.5 text-[12px] text-secondary/60">
                         Factor: {u.note}
@@ -487,7 +590,10 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
                         EQUIV. COST
                       </Text>
                       <Text className="text-[15px] font-semibold text-secondary">
-                        ₱{fmt((Number.isFinite(costNum) ? costNum : 0) * u.factor)}
+                        ₱
+                        {fmt(
+                          (Number.isFinite(costNum) ? costNum : 0) * u.factor,
+                        )}
                       </Text>
                     </View>
                     <Pressable
@@ -504,12 +610,19 @@ export default function InventoryItemActions({ item, onClose, onSave }: Props) {
               </View>
             </ScrollView>
 
+            {/* Error banner */}
+            {formError && (
+              <View className="border-t border-tertiary-soft/60 bg-white px-6 py-3">
+                <Text className="text-[13px] text-red-700">{formError}</Text>
+              </View>
+            )}
+
             {/* Footer */}
             <View className="flex-row justify-end border-t border-tertiary-soft/60 bg-neutral px-6 py-4">
               <Button label="Cancel" variant="outline" onPress={onClose} />
               <View className="w-3" />
               <Button
-                label={saving ? "Saving…" : "Save Changes"}
+                label={saving ? "Saving…" : isAdd ? "Add Item" : "Save Changes"}
                 onPress={handleSave}
                 // disabled={!canSave}
               />
