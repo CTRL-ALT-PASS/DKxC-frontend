@@ -44,7 +44,7 @@ export default function TransactionHistoryScreen() {
     <View className="flex-1 bg-neutral">
       <Header title="Order History" date={today} />
 
-      <ScrollView className="flex-1 p-6">
+      <ScrollView className="flex-1 p-4">
         {loading && mine.length === 0 ? (
           <View className="mt-12 items-center">
             <ActivityIndicator />
@@ -70,7 +70,7 @@ export default function TransactionHistoryScreen() {
         {mine.map((order) => (
           <View
             key={order.order_id}
-            className="bg-white rounded-2xl p-5 mb-4 max-w-xl"
+            className="w-full bg-white rounded-2xl p-4 mb-3"
           >
             <View className="flex-row justify-between items-center mb-3">
               <View>

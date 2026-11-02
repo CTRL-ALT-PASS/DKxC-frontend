@@ -160,7 +160,7 @@ export default function PendingOrdersScreen() {
     <View className="flex-1 bg-neutral">
       <Header title="Pending Orders" date={today} />
 
-      <ScrollView className="flex-1 p-6">
+      <ScrollView className="flex-1 p-4">
         <View className="mb-5 flex-row items-center justify-between">
           <View>
             <Text className="text-2xl font-semibold text-secondary">
@@ -211,11 +211,12 @@ export default function PendingOrdersScreen() {
             </Text>
           </View>
         ) : (
-          orders.map((order) => (
-            <View
-              key={order.order_id}
-              className="mb-5 max-w-4xl rounded-2xl border border-tertiary-soft/50 bg-white p-5"
-            >
+          <View className="flex-row flex-wrap justify-between">
+            {orders.map((order) => (
+              <View
+                key={order.order_id}
+                className="mb-4 w-full rounded-2xl border border-tertiary-soft/50 bg-white p-5 lg:w-[49%]"
+              >
               <View className="mb-4 flex-row flex-wrap items-start justify-between gap-3">
                 <View>
                   <Text className="text-lg font-semibold text-secondary">
@@ -368,8 +369,9 @@ export default function PendingOrdersScreen() {
                   Finish order
                 </Text>
               </Pressable>
-            </View>
-          ))
+              </View>
+            ))}
+          </View>
         )}
       </ScrollView>
 
