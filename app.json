@@ -14,7 +14,6 @@
         "foregroundImage": "./assets/images/darcys-logo-light.png",
         "monochromeImage": "./assets/images/darcys-logo-light.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.sf3bctrlaltpass.darcyskitchencafe"
     },
@@ -24,14 +23,14 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/darcys-logo-light.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/darcys-logo-light.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
