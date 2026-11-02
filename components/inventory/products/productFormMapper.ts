@@ -1,13 +1,13 @@
 import type {
-    CreateProductInput,
-    Product,
-    RecipeIngredient,
+  CreateProductInput,
+  Product,
+  RecipeIngredient,
 } from "@/services/productsApi";
 
 import {
-    uid,
-    type IngredientLine,
-    type ProductFormValues,
+  uid,
+  type IngredientLine,
+  type ProductFormValues,
 } from "./ProductFormScreen";
 
 /** "150.000" -> "150", "115.00" -> "115" (nicer in inputs; the API accepts either) */
@@ -22,7 +22,7 @@ const toLines = (items: RecipeIngredient[]): IngredientLine[] =>
 
 export function toFormValues(product: Product): ProductFormValues {
   return {
-    imageUri: null, // swap for product.image_url once the backend returns it
+    imageUri: product.image_url, // remote preview; a newly picked photo replaces it in the form
     name: product.product_name,
     description: product.description ?? "",
     categoryId: String(product.category_id),
@@ -50,6 +50,9 @@ const toRecipe = (lines: IngredientLine[]): RecipeIngredient[] =>
 /**
  * Used for both POST and PATCH. On PATCH every list we send replaces the stored one:
  * sizes keep their size_id (kept) and new sizes don't (created); sizes left out are deleted.
+ *
+ * The photo is NOT part of this payload: the API takes it in a separate call.
+ * After create/update succeeds, apply `values.imageChange` (uploadImage / removeImage).
  */
 export function toPayload(values: ProductFormValues): CreateProductInput {
   return {

@@ -4,12 +4,15 @@ import {
   ApiError,
   createProduct,
   deleteProduct,
+  deleteProductImage,
   getProduct,
   getProducts,
   updateProduct,
+  uploadProductImage,
   type CreateProductInput,
   type Product,
   type ProductFilters,
+  type ProductImageFile,
   type UpdateProductInput,
 } from "@/services/productsApi";
 
@@ -96,7 +99,50 @@ export function useProducts(filters: ProductFilters = {}) {
     }
   }, []);
 
-  return { products, loading, error, saving, refetch, create, update, remove };
+  // Image mutations also throw. For a NEW product: `create()` first, then
+  // `uploadImage(created.product_id, file)`. If the upload fails the product
+  // still exists, so let the user retry the upload instead of re-creating it.
+  const uploadImage = useCallback(
+    async (id: number, file: ProductImageFile) => {
+      setSaving(true);
+      try {
+        const res = await uploadProductImage(id, file);
+        setProducts((prev) =>
+          prev.map((p) => (p.product_id === id ? res.data : p)),
+        );
+        return res.data;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [],
+  );
+
+  const removeImage = useCallback(async (id: number) => {
+    setSaving(true);
+    try {
+      const res = await deleteProductImage(id);
+      setProducts((prev) =>
+        prev.map((p) => (p.product_id === id ? res.data : p)),
+      );
+      return res.data;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  return {
+    products,
+    loading,
+    error,
+    saving,
+    refetch,
+    create,
+    update,
+    remove,
+    uploadImage,
+    removeImage,
+  };
 }
 
 /* ------------------------------------------------------------------ */

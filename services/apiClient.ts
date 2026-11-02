@@ -30,6 +30,7 @@ type Query = Record<string, string | number | undefined | null>;
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /** A plain object is sent as JSON; a FormData is sent as multipart (file uploads). */
   body?: unknown;
   query?: Query;
   signal?: AbortSignal;
@@ -63,18 +64,29 @@ export async function request<T>(
 ): Promise<T> {
   const token = await getAuthToken();
 
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+
   const headers: Record<string, string> = {
     Accept: "application/json",
     ...extraHeaders,
   };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // For FormData, leave Content-Type unset: fetch adds `multipart/form-data`
+  // with the boundary itself, and a hand-set header would drop the boundary.
+  if (body !== undefined && !isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
   // Set last so a caller can never override the session token
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const response = await fetch(buildUrl(path, query), {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body:
+      body === undefined
+        ? undefined
+        : isFormData
+          ? (body as FormData)
+          : JSON.stringify(body),
     signal,
   });
 

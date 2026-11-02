@@ -4,6 +4,7 @@
 // Add-ons are NOT created here. Which add-ons a category offers is managed in the add-on
 // management flow; this screen only lets you switch off add-ons for this one product.
 
+import { toProductImageFile, type ProductImageFile } from "@/services/productsApi";
 import { notify } from "@/utils/dialogs";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -59,9 +60,24 @@ export type SizeRow = {
   ingredients: IngredientLine[];
 };
 
+/**
+ * What the user did to the photo this session. The form never uploads by itself:
+ * the parent saves the product first, then applies this (see uploadImage / removeImage).
+ *  - { type: "upload" } a new photo was picked (new product, or replacing the old one)
+ *  - { type: "remove" } the existing photo was removed
+ *  - null               photo untouched
+ */
+export type ImageChange =
+  | { type: "upload"; file: ProductImageFile }
+  | { type: "remove" }
+  | null;
+
 export type ProductFormValues = {
   name: string;
+  /** Preview only: product.image_url when editing, or the local file after picking. */
   imageUri: string | null;
+  /** Set on save; the parent applies it after create/update succeeds. */
+  imageChange?: ImageChange;
   description: string;
   categoryId: string | null;
   price: string;
@@ -86,6 +102,7 @@ type Props = {
 /* ----------------------------- Helpers ----------------------------- */
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]; // same as the bucket
 const ROSE = "#be123c"; // rose-700
 const MUTED = "#a3a3a3"; // neutral-400
 
@@ -639,6 +656,8 @@ function SizesSection({
               }}
               trackColor={{ false: "#d4d4d4", true: ROSE }}
               thumbColor="#be123c"
+              // @ts-expect-error web-only prop
+              activeThumbColor="#be123c"
             />
           </View>
         }
@@ -741,6 +760,8 @@ function AddOnsSection({
                   onValueChange={(v) => onToggle(a.id, v)}
                   trackColor={{ false: "#d4d4d4", true: ROSE }}
                   thumbColor="#be123c"
+                  // @ts-expect-error web-only prop
+                  activeThumbColor="#be123c"
                 />
               </View>
             );
@@ -764,6 +785,9 @@ export default function ProductFormScreen({
   onCancel,
 }: Props) {
   const [imageUri, setImageUri] = useState(initialValues?.imageUri ?? null);
+  // A newly picked photo waiting to be uploaded. null = nothing new picked.
+  const [imageFile, setImageFile] = useState<ProductImageFile | null>(null);
+  const hadImage = !!initialValues?.imageUri;
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -843,7 +867,7 @@ export default function ProductFormScreen({
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.7, // keeps phone photos well under the server upload limit
     });
     if (result.canceled) return;
     const asset = result.assets[0];
@@ -851,7 +875,17 @@ export default function ProductFormScreen({
       notify("Image too large", "Please choose a photo up to 5MB.");
       return;
     }
+    if (asset.mimeType && !ALLOWED_IMAGE_TYPES.includes(asset.mimeType)) {
+      notify("Unsupported image", "Please choose a PNG, JPG, or WEBP photo.");
+      return;
+    }
     setImageUri(asset.uri);
+    setImageFile(toProductImageFile(asset));
+  };
+
+  const removeImage = () => {
+    setImageUri(null);
+    setImageFile(null);
   };
 
   const handleSave = async () => {
@@ -864,8 +898,14 @@ export default function ProductFormScreen({
     setSaving(true);
     try {
       const offeredIds = new Set(offeredAddOns.map((a) => a.id));
+      const imageChange: ImageChange = imageFile
+        ? { type: "upload", file: imageFile }
+        : hadImage && imageUri === null
+          ? { type: "remove" }
+          : null;
       await onSave({
         imageUri,
+        imageChange,
         name: name.trim(),
         description: description.trim(),
         categoryId,
@@ -939,6 +979,13 @@ export default function ProductFormScreen({
                         />
                         <Text className="text-[10px] text-white">Change</Text>
                       </View>
+                      <Pressable
+                        onPress={removeImage}
+                        hitSlop={8}
+                        className="absolute right-2 top-2 h-7 w-7 items-center justify-center rounded-full bg-black/60 active:bg-black/80"
+                      >
+                        <Ionicons name="close" size={16} color="#fff" />
+                      </Pressable>
                     </>
                   ) : (
                     <View className="items-center gap-2 px-3">

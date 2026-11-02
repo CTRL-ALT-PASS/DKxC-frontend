@@ -19,7 +19,9 @@ import { ApiError } from "../../services/apiClient";
 import {
   createProduct,
   deleteProduct,
+  deleteProductImage,
   updateProduct,
+  uploadProductImage,
 } from "../../services/productsApi";
 import { confirm, describeError, notify } from "../../utils/dialogs";
 
@@ -79,14 +81,38 @@ export default function ProductFormRoute() {
   );
 
   const handleSave = async (values: ProductFormValues) => {
+    // 1) Save the product itself.
+    let savedId: number;
     try {
       const payload = toPayload(values);
-      if (isEdit) await updateProduct(productId, payload);
-      else await createProduct(payload);
-      router.back(); // the products screen refetches on focus
+      if (isEdit) {
+        await updateProduct(productId, payload);
+        savedId = productId;
+      } else {
+        savedId = (await createProduct(payload)).data.product_id;
+      }
     } catch (e) {
       notify("Couldn't save product", describeError(e));
+      return;
     }
+
+    // 2) The photo has its own endpoint, so it's applied once the product exists.
+    try {
+      const change = values.imageChange;
+      if (change?.type === "upload") {
+        await uploadProductImage(savedId, change.file);
+      } else if (change?.type === "remove") {
+        await deleteProductImage(savedId);
+      }
+    } catch (e) {
+      notify("Product saved, but the photo wasn't", describeError(e));
+      // A new product exists now: switch this screen to edit mode so pressing
+      // Save again updates it instead of creating a duplicate.
+      if (!isEdit) router.setParams({ id: String(savedId) });
+      return;
+    }
+
+    router.back(); // the products screen refetches on focus
   };
 
   const handleDelete = async () => {
