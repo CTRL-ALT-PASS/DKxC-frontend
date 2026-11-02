@@ -1,4 +1,4 @@
-import { ApiError, request } from "@/services/apiClient";
+import { ApiError, request, uploadForm } from "@/services/apiClient";
 
 export { ApiError }; // keeps `import { ApiError } from "@/services/productsApi"` working
 
@@ -175,10 +175,8 @@ export async function uploadProductImage(
     form.append("image", file as unknown as Blob);
   }
 
-  return request<MutationResponse>(`/products/${id}/image`, {
-    method: "POST",
-    body: form,
-  });
+  // Sent with XHR (see uploadForm): Expo's fetch can't send { uri, name, type } parts.
+  return uploadForm<MutationResponse>(`/products/${id}/image`, form);
 }
 
 export function deleteProductImage(id: number): Promise<MutationResponse> {
