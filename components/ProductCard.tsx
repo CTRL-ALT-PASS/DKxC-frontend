@@ -39,20 +39,33 @@ export default function ProductCard({
         style={{ width: PRODUCT_CARD_WIDTH }}
         className="bg-white rounded-2xl p-3"
       >
-        {/* The API has no image field yet, so show an initial placeholder */}
-        <View
-          style={{
-            width: "100%",
-            height: 124,
-            borderRadius: 12,
-            marginBottom: 8,
-          }}
-          className="bg-slate-100 items-center justify-center"
-        >
-          <Text className="text-4xl font-bold text-slate-300">
-            {product.product_name.charAt(0).toUpperCase()}
-          </Text>
-        </View>
+        {product.image_url ? (
+          <Image
+            source={{ uri: product.image_url }}
+            style={{
+              width: "100%",
+              height: 124,
+              borderRadius: 12,
+              marginBottom: 8,
+            }}
+            contentFit="cover"
+          />
+        ) : (
+          // No photo uploaded yet: show the product's initial instead
+          <View
+            style={{
+              width: "100%",
+              height: 124,
+              borderRadius: 12,
+              marginBottom: 8,
+            }}
+            className="bg-slate-100 items-center justify-center"
+          >
+            <Text className="text-4xl font-bold text-slate-300">
+              {product.product_name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
 
         <Text className="font-semibold text-slate-800">
           {product.product_name}

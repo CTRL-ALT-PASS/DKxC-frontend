@@ -3,7 +3,6 @@ import ProductGrid from "@/components/shared/ProductGrid";
 import SearchBar from "@/components/shared/SearchBar";
 import { useProducts } from "@/hooks/use-products";
 import { useSearch } from "@/hooks/use-search";
-import type { Product } from "@/services/productsApi";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight, Pencil, Plus } from "lucide-react-native";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -33,6 +32,10 @@ export default function ProductsScreen() {
 
   const { categories, refetch: refetchCategories } = useCategories();
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
+  const categoryNameById = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.category_id, c.category_name])),
+    [categories],
+  );
 
   const { addOns, refetch: refetchAddOns } = useAddOns();
   const [manageAddOnsOpen, setManageAddOnsOpen] = useState(false);
@@ -58,30 +61,11 @@ export default function ProductsScreen() {
     }, []),
   );
 
-  const categoryNames = useMemo(
-    () => new Map(categories.map((c) => [c.category_id, c.category_name])),
-    [categories],
-  );
-
-  // Adapt the API shape to what InventoryProductCard expects.
-  const cardProducts = useMemo(
-    () =>
-      products.map((p: Product) => ({
-        id: String(p.product_id),
-        name: p.product_name,
-        category: categoryNames.get(p.category_id) ?? "",
-        price: Number(p.selling_price),
-        available: p.is_available,
-        status: p.product_status,
-      })),
-    [products, categoryNames],
-  );
-
   const {
     query,
     setQuery,
     results: filtered,
-  } = useSearch(cardProducts, (p) => p.name);
+  } = useSearch(products, (p) => p.product_name);
 
   /* ---------------- Category row: chevron scrolling ---------------- */
   const categoryScrollRef = useRef<ScrollView>(null);
@@ -103,8 +87,11 @@ export default function ProductsScreen() {
   };
 
   const openAddProduct = () => router.push(PRODUCT_FORM_ROUTE as any);
-  const openEditProduct = (id: string) =>
-    router.push({ pathname: PRODUCT_FORM_ROUTE as any, params: { id } });
+  const openEditProduct = (id: number) =>
+    router.push({
+      pathname: PRODUCT_FORM_ROUTE as any,
+      params: { id: String(id) },
+    });
 
   const openManageAddOns = () => {
     refetchAddOns(); // pick up any category changes made since the last open
@@ -224,12 +211,12 @@ export default function ProductsScreen() {
         ) : (
           <ProductGrid
             data={filtered}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => String(item.product_id)}
             renderCard={(item) => (
               <InventoryProductCard
                 product={item}
-                available={item.available}
-                onPress={() => openEditProduct(item.id)}
+                categoryName={categoryNameById[item.category_id]}
+                onPress={() => openEditProduct(item.product_id)}
               />
             )}
             ListEmptyComponent={

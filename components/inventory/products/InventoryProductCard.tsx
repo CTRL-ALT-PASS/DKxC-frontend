@@ -1,18 +1,32 @@
 import { Image } from "expo-image";
 import { Eye, EyeOff, ImageIcon } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
-import type { Product } from "../../../constants/mockData";
 import MarqueeBadge from "./MarqueeBadge";
 
+/**
+ * The slice of an API product this card needs. The `Product` type from
+ * services/productsApi satisfies it as-is, so pass those objects straight in.
+ */
+export interface InventoryCardProduct {
+  product_name: string;
+  /** Full public URL of the photo (image_path is only the storage key). null = no photo yet. */
+  image_url: string | null;
+  is_available?: boolean;
+}
+
 interface InventoryProductCardProps {
-  product: Product;
+  product: InventoryCardProduct;
+  /** Category name. The API product only has category_id, so the parent looks the name up. */
+  categoryName?: string;
+  /** Overrides product.is_available */
   available?: boolean;
   onPress?: () => void;
 }
 
 export default function InventoryProductCard({
   product,
-  available = true,
+  categoryName,
+  available = product.is_available ?? true,
   onPress,
 }: InventoryProductCardProps) {
   return (
@@ -20,9 +34,9 @@ export default function InventoryProductCard({
       onPress={onPress}
       className="bg-white rounded-2xl p-3 w-40 border border-slate-200"
     >
-      {product.image ? (
+      {product.image_url ? (
         <Image
-          source={product.image}
+          source={{ uri: product.image_url }}
           style={{
             width: "100%",
             height: 124,
@@ -37,7 +51,9 @@ export default function InventoryProductCard({
         </View>
       )}
 
-      <Text className="font-semibold text-slate-800">{product.name}</Text>
+      <Text className="font-semibold text-slate-800">
+        {product.product_name}
+      </Text>
 
       <View className="flex-row items-center justify-between mt-2">
         <View className="flex-row items-center">
@@ -54,7 +70,7 @@ export default function InventoryProductCard({
             {available ? "Available" : "Unavailable"}
           </Text>
         </View>
-        <MarqueeBadge label={product.category} />
+        {categoryName ? <MarqueeBadge label={categoryName} /> : null}
       </View>
     </Pressable>
   );

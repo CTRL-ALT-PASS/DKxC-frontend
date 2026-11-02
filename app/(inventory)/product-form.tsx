@@ -80,6 +80,13 @@ export default function ProductFormRoute() {
     [product],
   );
 
+  // router.back() throws GO_BACK when there's no history (form opened directly
+  // or the page was reloaded on web), so fall back to the products list.
+  const leaveForm = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(inventory)/products");
+  };
+
   const handleSave = async (values: ProductFormValues) => {
     // 1) Save the product itself.
     let savedId: number;
@@ -112,7 +119,7 @@ export default function ProductFormRoute() {
       return;
     }
 
-    router.back(); // the products screen refetches on focus
+    leaveForm(); // the products screen refetches on focus
   };
 
   const handleDelete = async () => {
@@ -126,7 +133,7 @@ export default function ProductFormRoute() {
 
     try {
       await deleteProduct(productId);
-      router.back();
+      leaveForm();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         const discontinue = await confirm(
@@ -137,7 +144,7 @@ export default function ProductFormRoute() {
         if (discontinue) {
           try {
             await updateProduct(productId, { product_status: "Discontinued" });
-            router.back();
+            leaveForm();
           } catch (err) {
             notify("Couldn't update product", describeError(err));
           }
@@ -163,7 +170,7 @@ export default function ProductFormRoute() {
         <View className="flex-1 items-center justify-center bg-neutral p-6">
           <Text className="text-secondary mb-3">{loadError.message}</Text>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => leaveForm()}
             className="bg-primary rounded-lg px-4 py-2"
           >
             <Text className="text-white font-medium">Go back</Text>
