@@ -111,3 +111,63 @@ export async function request<T>(
 
   return payload as T;
 }
+
+/**
+ * Multipart upload (file pickers). Uses XMLHttpRequest on purpose: Expo's global
+ * `fetch` rejects React Native's { uri, name, type } file parts with
+ * "Unsupported FormDataPart implementation", while XHR still supports them natively
+ * (and handles real Blobs on web). No Content-Type is set so the boundary is added.
+ */
+export async function uploadForm<T>(
+  path: string,
+  form: FormData,
+  signal?: AbortSignal,
+): Promise<T> {
+  const token = await getAuthToken();
+
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", buildUrl(path));
+    xhr.setRequestHeader("Accept", "application/json");
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.timeout = 60000;
+
+    xhr.onload = () => {
+      let payload: any = null;
+      try {
+        payload = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+      } catch {
+        payload = null;
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(payload as T);
+        return;
+      }
+
+      const fail = () =>
+        reject(
+          new ApiError(
+            xhr.status,
+            payload?.message ?? `Request failed (${xhr.status})`,
+            { code: payload?.code, errors: payload?.errors, data: payload },
+          ),
+        );
+      if (xhr.status === 401) clearAuthToken().then(fail, fail);
+      else fail();
+    };
+    xhr.onerror = () => reject(new Error("Network request failed"));
+    xhr.ontimeout = () => reject(new Error("Upload timed out"));
+
+    if (signal) {
+      signal.addEventListener("abort", () => {
+        xhr.abort();
+        const err = new Error("Aborted");
+        err.name = "AbortError";
+        reject(err);
+      });
+    }
+
+    xhr.send(form);
+  });
+}
