@@ -1,41 +1,69 @@
 import SearchBar from "@/components/shared/SearchBar";
+import { useCategories } from "@/hooks/use-categories";
+import { useProducts } from "@/hooks/use-products";
 import { useSearch } from "@/hooks/use-search";
-import { useMemo, useState } from "react";
-import { Pressable, Text, useWindowDimensions, View } from "react-native";
+import { orderErrorMessage } from "@/services/ordersApi";
+import type { Product } from "@/services/productsApi";
+import { useFocusEffect, useRouter } from "expo-router";
+import { ClipboardCheck } from "lucide-react-native";
+import { useCallback, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  Switch,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import addIcon from "../../assets/icons/basket-add.png";
 import chevronIcon from "../../assets/icons/chevron-down.png";
 import CategoryDropdown from "../../components/CategoryDropdown";
 import Header from "../../components/Header";
-import PaymentModeModal from "../../components/PaymentModeModal";
 import ProductCard from "../../components/ProductCard";
 import ProductOptionsModal from "../../components/ProductOptionsModal";
 import ProductGrid from "../../components/shared/ProductGrid";
-import type { Product } from "../../constants/mockData";
 import {
   formatOptions,
   formatPromo,
   getLineTotal,
+  SENIOR_PWD_DISCOUNT_PERCENT,
 } from "../../constants/pricing";
 import { useAuth } from "../../context/AuthContext";
-import { useCart, type PaymentMode } from "../../context/CartContext";
-import { useProducts } from "../../hooks/use-products";
+import { useCart } from "../../context/CartContext";
+
+// Stable reference so useProducts doesn't see a new filters object each render
+const POS_FILTERS = { product_status: "Active" } as const;
 
 export default function POSScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const { user } = useAuth();
-  const {
-    products,
-    categories,
-    loading: loadingMenu,
-    error: menuError,
-  } = useProducts();
   const [category, setCategory] = useState("All");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const { items, list, total, orderType, dispatch, completeTransaction } =
-    useCart();
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const { products, loading, error, refetch } = useProducts(POS_FILTERS);
+  const { categories } = useCategories();
+  const {
+    items,
+    list,
+    subtotal,
+    seniorPwdDiscount,
+    isSeniorPwd,
+    total,
+    orderType,
+    placing,
+    dispatch,
+    placeOrder,
+  } = useCart();
   const isCartEmpty = list.length === 0;
   const summaryWidth = Math.min(320, Math.max(220, Math.round(width * 0.22)));
+
+  // Stock changes as orders complete, so refresh availability when returning to this screen
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch]),
+  );
 
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -43,34 +71,50 @@ export default function POSScreen() {
     day: "numeric",
   });
 
-  const categoryFiltered = useMemo(
-    () => products.filter((p) => category === "All" || p.category === category),
-    [category, products],
+  const categoryOptions = useMemo(
+    () => ["All", ...categories.map((c) => c.category_name)],
+    [categories],
   );
+  const categoryNameById = useMemo(
+    () =>
+      Object.fromEntries(
+        categories.map((c) => [c.category_id, c.category_name]),
+      ),
+    [categories],
+  );
+
+  const categoryFiltered = useMemo(() => {
+    if (category === "All") return products;
+    const selected = categories.find((c) => c.category_name === category);
+    return products.filter((p) => p.category_id === selected?.category_id);
+  }, [products, categories, category]);
 
   const {
     query,
     setQuery,
     results: filtered,
-  } = useSearch(categoryFiltered, (p) => p.name);
+  } = useSearch(categoryFiltered, (p) => p.product_name);
 
   const chooseOrderType = (type: "Dine In" | "Take out") => {
     dispatch({ type: "SET_ORDER_TYPE", orderType: type });
-    if (!isCartEmpty) {
-      setPaymentModalOpen(true);
-    }
   };
 
-  const handlePaymentConfirm = (mode: PaymentMode) => {
-    completeTransaction(mode);
-    setPaymentModalOpen(false);
+  const handlePlaceOrder = async () => {
+    if (isCartEmpty || placing) return;
+    setOrderError(null);
+    try {
+      await placeOrder();
+      router.navigate("/pending");
+    } catch (e) {
+      setOrderError(orderErrorMessage(e)); // cart is kept so the cashier can retry
+    }
   };
 
   // This route is only reachable after logging in, so user is always set here.
   if (!user) return null;
 
   return (
-    <View className="flex-1 bg-[#F4F6F4]">
+    <View className="flex-1 bg-neutral">
       <Header title="Darcy's Kitchen & Cafe POS" date={today} />
 
       <View className="flex-1 flex-row">
@@ -83,30 +127,45 @@ export default function POSScreen() {
               className="w-80 mr-4"
             />
             <CategoryDropdown
-              categories={categories}
+              categories={categoryOptions}
               selected={category}
               onSelect={setCategory}
               chevronIcon={chevronIcon}
             />
           </View>
 
-          {loadingMenu ? (
-            <Text className="text-slate-400 mt-6">Loading menu...</Text>
-          ) : menuError ? (
-            <Text className="text-warn mt-6">{menuError}</Text>
+          {loading && products.length === 0 ? (
+            <View className="mt-6 items-start">
+              <ActivityIndicator />
+            </View>
+          ) : error ? (
+            <View className="mt-6">
+              <Text className="text-warn mb-2">
+                Couldn't load products: {error.message}
+              </Text>
+              <Pressable
+                onPress={refetch}
+                className="self-start rounded-xl bg-primary px-4 py-2"
+              >
+                <Text className="text-white font-semibold">Retry</Text>
+              </Pressable>
+            </View>
+          ) : filtered.length === 0 ? (
+            <Text className="text-slate-400 mt-6">No products found.</Text>
           ) : (
             <ProductGrid
               data={filtered}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => String(item.product_id)}
               extraData={items}
               renderCard={(item) => (
                 <ProductCard
                   product={item}
-                  quantity={items[item.id]?.quantity || 0}
+                  categoryName={categoryNameById[item.category_id] ?? "Other"}
+                  quantity={items[String(item.product_id)]?.quantity || 0}
                   addIcon={addIcon}
                   onIncrease={() => dispatch({ type: "ADD", product: item })}
                   onDecrease={() =>
-                    dispatch({ type: "DECREASE", key: item.id })
+                    dispatch({ type: "DECREASE", key: String(item.product_id) })
                   }
                   onOpenSpecs={() => setActiveProduct(item)}
                 />
@@ -114,11 +173,14 @@ export default function POSScreen() {
             />
           )}
         </View>
+
         <View
           style={{ width: summaryWidth }}
           className="bg-white p-6 border-l border-slate-200"
         >
-          <Text className="text-lg font-semibold text-darcy mb-4">Summary</Text>
+          <Text className="text-lg font-semibold text-secondary mb-4">
+            Summary
+          </Text>
           {list.map((entry) => (
             <View
               key={entry.key}
@@ -126,15 +188,15 @@ export default function POSScreen() {
             >
               <View className="flex-1 pr-2">
                 <Text>
-                  {entry.product.name} ({entry.quantity}x)
+                  {entry.product.product_name} ({entry.quantity}x)
                 </Text>
                 {entry.options && (
                   <Text className="text-xs text-slate-500">
-                    {formatOptions(entry.options)}
+                    {formatOptions(entry.product, entry.options)}
                   </Text>
                 )}
                 {!!entry.discountPercent && (
-                  <Text className="text-xs text-darcy font-medium">
+                  <Text className="text-xs text-primary font-medium">
                     {formatPromo(
                       entry.product,
                       entry.options,
@@ -162,17 +224,36 @@ export default function POSScreen() {
           ))}
 
           <View className="mt-auto pt-4 border-t border-slate-200">
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="flex-1 pr-3">
+                <Text className="text-sm font-semibold text-slate-800">
+                  PWD / Senior Citizen
+                </Text>
+                <Text className="text-xs text-slate-500">
+                  {SENIOR_PWD_DISCOUNT_PERCENT}% off the order
+                </Text>
+              </View>
+              <Switch
+                value={isSeniorPwd}
+                onValueChange={(enabled) =>
+                  dispatch({ type: "SET_SENIOR_PWD", enabled })
+                }
+                trackColor={{ false: "#CBD5E1", true: "#BE185D" }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+
             <View className="flex-row gap-2 mb-4">
               <Pressable
                 onPress={() => chooseOrderType("Dine In")}
                 className={`flex-1 py-2 rounded-xl items-center justify-center ${
                   orderType === "Dine In"
-                    ? "bg-darcy"
-                    : "bg-white border border-darcy"
+                    ? "bg-primary"
+                    : "bg-white border border-primary"
                 }`}
               >
                 <Text
-                  className={`text-sm font-semibold ${orderType === "Dine In" ? "text-white" : "text-darcy"}`}
+                  className={`text-sm font-semibold ${orderType === "Dine In" ? "text-white" : "text-secondary"}`}
                   numberOfLines={1}
                 >
                   Dine In
@@ -182,12 +263,12 @@ export default function POSScreen() {
                 onPress={() => chooseOrderType("Take out")}
                 className={`flex-1 py-2 rounded-xl items-center justify-center ${
                   orderType === "Take out"
-                    ? "bg-darcy"
-                    : "bg-white border border-darcy"
+                    ? "bg-primary"
+                    : "bg-white border border-primary"
                 }`}
               >
                 <Text
-                  className={`text-sm font-semibold ${orderType === "Take out" ? "text-white" : "text-darcy"}`}
+                  className={`text-sm font-semibold ${orderType === "Take out" ? "text-white" : "text-secondary"}`}
                   numberOfLines={1}
                 >
                   Take out
@@ -207,18 +288,61 @@ export default function POSScreen() {
               </Pressable>
             </View>
 
+            {isSeniorPwd && (
+              <>
+                <View className="flex-row justify-between mb-1">
+                  <Text className="text-sm text-slate-500">Subtotal</Text>
+                  <Text className="text-sm text-slate-500">
+                    ₱{subtotal.toFixed(2)}
+                  </Text>
+                </View>
+                <View className="flex-row justify-between mb-2">
+                  <Text className="text-sm text-primary font-medium">
+                    PWD / Senior ({SENIOR_PWD_DISCOUNT_PERCENT}%)
+                  </Text>
+                  <Text className="text-sm text-primary font-medium">
+                    −₱{seniorPwdDiscount.toFixed(2)}
+                  </Text>
+                </View>
+              </>
+            )}
+
             <View className="flex-row justify-between">
               <Text className="font-semibold">
                 Total ({list.reduce((s, i) => s + i.quantity, 0)} items):
               </Text>
               <Text className="font-semibold">₱{total.toFixed(2)}</Text>
             </View>
+            {orderError && (
+              <Text className="text-xs text-warn mt-3">{orderError}</Text>
+            )}
+            <Pressable
+              disabled={isCartEmpty || placing}
+              onPress={handlePlaceOrder}
+              className={`mt-4 flex-row items-center justify-center gap-2 rounded-xl py-3 ${
+                isCartEmpty || placing ? "bg-slate-300" : "bg-primary"
+              }`}
+            >
+              {placing ? (
+                <ActivityIndicator size="small" />
+              ) : (
+                <ClipboardCheck
+                  size={18}
+                  color={isCartEmpty ? "#64748B" : "#FFFFFF"}
+                />
+              )}
+              <Text
+                className={`font-semibold ${isCartEmpty || placing ? "text-slate-500" : "text-white"}`}
+              >
+                {placing ? "Placing…" : "Place order"}
+              </Text>
+            </Pressable>
           </View>
         </View>
       </View>
 
       <ProductOptionsModal
-        key={activeProduct?.id ?? "closed"}
+        key={activeProduct?.product_id ?? "closed"}
         product={activeProduct}
         visible={!!activeProduct}
         onClose={() => setActiveProduct(null)}
@@ -232,13 +356,6 @@ export default function POSScreen() {
             discountPercent,
           })
         }
-      />
-
-      <PaymentModeModal
-        visible={paymentModalOpen}
-        total={total}
-        onClose={() => setPaymentModalOpen(false)}
-        onConfirm={handlePaymentConfirm}
       />
     </View>
   );

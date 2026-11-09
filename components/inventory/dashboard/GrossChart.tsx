@@ -78,6 +78,9 @@ const CHART_DATA: Record<Metric, Record<Timeframe, DataPoint[]>> = {
 const TIMEFRAMES: Timeframe[] = ["7d", "30d", "90d"];
 const CHART_HEIGHT = 190;
 const GRIDLINE_COUNT = 5;
+// Cap on each bar's column so short ranges (e.g. 4 months) don't stretch
+// across the whole width. Columns are centered as a group instead.
+const MAX_COLUMN_WIDTH = 96;
 
 function niceMax(rawMax: number) {
   const step = Math.pow(10, Math.floor(Math.log10(rawMax || 1)) - 1) * 3;
@@ -98,12 +101,15 @@ export default function GrossChart({ metric }: GrossChartProps) {
   const gridlines = useMemo(() => {
     const step = maxValue / GRIDLINE_COUNT;
     return Array.from({ length: GRIDLINE_COUNT }, (_, i) =>
-      Math.round(step * (GRIDLINE_COUNT - i))
+      Math.round(step * (GRIDLINE_COUNT - i)),
     );
   }, [maxValue]);
 
   return (
-    <View className="flex-1 rounded-2xl border border-black/10 bg-[#F7F4ED] p-5">
+    // w-full + self-stretch: take the full width of the modal even when the
+    // parent uses items-center (which would otherwise shrink this to its
+    // content and push the chart to one side).
+    <View className="w-full flex-1 self-stretch rounded-2xl border border-black/10 bg-[#F7F4ED] p-5">
       <View className="flex-row items-center justify-between">
         <Text className="text-xl font-bold text-black">{title}</Text>
 
@@ -133,12 +139,9 @@ export default function GrossChart({ metric }: GrossChartProps) {
         </View>
       </View>
 
-      <View className="mt-6 flex-row">
+      <View className="mt-6 w-full flex-row">
         {/* Y-axis labels */}
-        <View
-          style={{ height: CHART_HEIGHT }}
-          className="mr-3 justify-between"
-        >
+        <View style={{ height: CHART_HEIGHT }} className="mr-3 justify-between">
           {gridlines.map((g) => (
             <Text key={g} className="text-xs text-black/50">
               ₱{g}
@@ -147,7 +150,7 @@ export default function GrossChart({ metric }: GrossChartProps) {
         </View>
 
         {/* Chart area */}
-        <View className="flex-1">
+        <View className="min-w-0 flex-1">
           <View style={{ height: CHART_HEIGHT }} className="relative">
             {/* gridlines */}
             <View className="absolute inset-0 justify-between">
@@ -156,11 +159,13 @@ export default function GrossChart({ metric }: GrossChartProps) {
               ))}
             </View>
 
-            {/* bars */}
-            <View className="absolute inset-0 flex-row items-end justify-between px-1">
+            {/* bars — justify-center keeps the group centered when the
+                columns hit their max width */}
+            <View className="absolute inset-0 flex-row items-end justify-center px-1">
               {data.map((point) => (
                 <View
                   key={point.label}
+                  style={{ maxWidth: MAX_COLUMN_WIDTH }}
                   className="mx-1 flex-1 items-center justify-end"
                 >
                   <View
@@ -174,11 +179,12 @@ export default function GrossChart({ metric }: GrossChartProps) {
             </View>
           </View>
 
-          {/* X-axis labels */}
-          <View className="mt-2 flex-row justify-between px-1">
+          {/* X-axis labels — same column rules as the bars so they line up */}
+          <View className="mt-2 flex-row justify-center px-1">
             {data.map((point) => (
               <Text
                 key={point.label}
+                style={{ maxWidth: MAX_COLUMN_WIDTH }}
                 className="mx-1 flex-1 text-center text-xs text-black/50"
               >
                 {point.label}

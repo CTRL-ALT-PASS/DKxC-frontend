@@ -24,11 +24,11 @@ export default function SearchBar({
   return (
     <View className={className}>
       <TextField
-        icon={<Search size={18} color="#94a3b8" />}
+        icon={<Search size={18} color="#BE185D" />}
         placeholder={placeholder}
         value={value}
         onChangeText={onChangeText}
-        className="h-12 bg-white rounded-lg px-3"
+        className="h-12 bg-white rounded-lg px-3 border border-tertiary-soft"
       />
     </View>
   );

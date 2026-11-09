@@ -1,49 +1,75 @@
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 interface RankedItem {
   name: string;
   value: number;
 }
 
-// Mock data — replace with real aggregation later, and swap this
-// layout for a pie chart when that's ready.
-const BEST_SELLING_PRODUCTS: RankedItem[] = [
-  { name: "Green Matcha Latte", value: 500 },
-  { name: "Salted Caramel Frappe", value: 300 },
-  { name: "Croissant", value: 200 },
-];
+// canvas -> secondary -> secondary at 70%, dark to light like the mockup
+const RANK_TINTS = ["#1A0208", "#4C0519", "#4C0519B3"];
 
-const BEST_SELLING_CATEGORIES: RankedItem[] = [
-  { name: "Coffee", value: 800 },
-  { name: "Pastries", value: 200 },
-  { name: "Fruit tea", value: 200 },
-];
+const formatPeso = (n: number) =>
+  "₱" +
+  Math.round(n)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-const RANK_TINTS = ["#3F5A4A", "#7C9484", "#B7C4BA"];
-
-function RankedList({ title, items }: { title: string; items: RankedItem[] }) {
+function RankedList({
+  title,
+  items,
+  actionLabel,
+  onActionPress,
+}: {
+  title: string;
+  items: RankedItem[];
+  actionLabel?: string;
+  onActionPress?: () => void;
+}) {
   return (
-    <View>
-      <Text className="text-base font-bold text-[#141813]">{title}</Text>
-      <View className="mt-3">
+    // flex-1: both lists split the card's height equally
+    <View className="flex-1">
+      <View className="flex-row items-center justify-between">
+        <Text className="text-sm font-bold text-secondary">{title}</Text>
+        {actionLabel && (
+          <Pressable onPress={onActionPress} hitSlop={8}>
+            <Text className="text-xs font-medium text-primary">
+              {actionLabel}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Rows share the list's height evenly; minHeight keeps them
+          readable when there's no spare space (e.g. a short screen). */}
+      <View className="mt-3 flex-1">
+        {items.length === 0 && (
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-sm text-secondary/60">
+              No sales in this range
+            </Text>
+          </View>
+        )}
         {items.map((item, index) => (
           <View
             key={item.name}
-            className={`flex-row items-center gap-3 py-2.5 ${
-              index !== items.length - 1 ? "border-b border-black/[0.06]" : ""
+            style={{ minHeight: 44 }}
+            className={`flex-1 flex-row items-center gap-3 ${
+              index !== items.length - 1
+                ? "border-b border-tertiary-soft/30"
+                : ""
             }`}
           >
             <View
-              style={{ backgroundColor: RANK_TINTS[index] ?? "#B7C4BA" }}
+              style={{ backgroundColor: RANK_TINTS[index] ?? RANK_TINTS[2] }}
               className="h-6 w-6 items-center justify-center rounded-full"
             >
               <Text className="text-xs font-bold text-white">{index + 1}</Text>
             </View>
-            <Text className="flex-1 text-sm text-[#141813]" numberOfLines={1}>
+            <Text className="flex-1 text-sm text-secondary" numberOfLines={1}>
               {item.name}
             </Text>
-            <Text className="text-sm font-semibold text-[#141813]/70">
-              ₱{item.value}
+            <Text className="text-sm font-semibold text-secondary">
+              {formatPeso(item.value)}
             </Text>
           </View>
         ))}
@@ -52,13 +78,35 @@ function RankedList({ title, items }: { title: string; items: RankedItem[] }) {
   );
 }
 
-export default function BestSelling() {
+interface BestSellingProps {
+  products: RankedItem[]; // value = revenue
+  categories: RankedItem[];
+  onViewAllPress?: () => void;
+  onBreakdownPress?: () => void;
+}
+
+export default function BestSelling({
+  products,
+  categories,
+  onViewAllPress,
+  onBreakdownPress,
+}: BestSellingProps) {
   return (
-    <View className="gap-6 rounded-3xl bg-white p-5 shadow-sm">
-      <RankedList title="Best Selling Products" items={BEST_SELLING_PRODUCTS} />
+    <View className="flex-1 rounded-3xl border border-tertiary-soft/40 bg-white p-5 shadow-sm">
+      <RankedList
+        title="Best Selling Products"
+        items={products}
+        actionLabel="View All"
+        onActionPress={onViewAllPress}
+      />
+
+      <View className="my-4 h-px bg-tertiary-soft/40" />
+
       <RankedList
         title="Best Selling Categories"
-        items={BEST_SELLING_CATEGORIES}
+        items={categories}
+        actionLabel="Breakdown"
+        onActionPress={onBreakdownPress}
       />
     </View>
   );

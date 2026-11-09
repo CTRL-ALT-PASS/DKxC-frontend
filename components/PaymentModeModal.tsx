@@ -25,7 +25,7 @@ export default function PaymentModeModal({
       onRequestClose={onClose}
     >
       <View className="flex-1 bg-black/40 items-center justify-center px-6">
-        <View className="bg-cream rounded-3xl p-6 w-full max-w-sm">
+        <View className="bg-neutral rounded-3xl p-6 w-full max-w-sm">
           <Pressable
             onPress={onClose}
             hitSlop={8}
@@ -34,7 +34,7 @@ export default function PaymentModeModal({
             <Text className="text-2xl text-slate-700">×</Text>
           </Pressable>
 
-          <Text className="text-xl font-semibold text-darcy text-center mb-1 mt-2">
+          <Text className="text-xl font-semibold text-secondary text-center mb-1 mt-2">
             Payment Mode
           </Text>
           <Text className="text-center text-slate-500 mb-6">
@@ -46,7 +46,7 @@ export default function PaymentModeModal({
               onPress={() => setMode("Cash")}
               className={`flex-1 py-4 rounded-xl items-center border ${
                 mode === "Cash"
-                  ? "bg-darcy border-darcy"
+                  ? "bg-primary border-primary"
                   : "bg-white border-slate-300"
               }`}
             >
@@ -64,7 +64,7 @@ export default function PaymentModeModal({
               onPress={() => setMode("Cashless")}
               className={`flex-1 py-4 rounded-xl items-center border ${
                 mode === "Cashless"
-                  ? "bg-darcy border-darcy"
+                  ? "bg-primary border-primary"
                   : "bg-white border-slate-300"
               }`}
             >
@@ -82,7 +82,7 @@ export default function PaymentModeModal({
 
           <Pressable
             onPress={() => onConfirm(mode)}
-            className="bg-darcy rounded-xl py-4 items-center"
+            className="bg-primary rounded-xl py-4 items-center"
           >
             <Text className="text-white text-lg font-semibold">
               Confirm Payment

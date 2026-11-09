@@ -23,10 +23,8 @@ import {
 type AuthContextType = {
   user: AuthUser | null;
   isLoading: boolean;
-  sessionError: string | null;
   signIn: (employeeId: string, pinCode: string) => Promise<AuthUser>;
   signOut: () => Promise<void>;
-  retrySessionRestore: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,11 +32,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const restoreSession = useCallback(async () => {
     setIsLoading(true);
-    setSessionError(null);
 
     try {
       const token = await getAuthToken();
@@ -51,24 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const employee = await getCurrentEmployee(token);
       setUser(employee);
     } catch (error) {
-      if (error instanceof Error && error.message === "SESSION_INVALID") {
-        // Only clear the token when Laravel rejects it.
-        try {
-          await clearAuthToken();
-        } catch (storageError) {
-          console.error("Failed to clear invalid token:", storageError);
-        }
+      // Any failure restoring the session: discard it and start over.
+      console.warn("Session restoration failed, clearing session:", error);
 
-        setUser(null);
-        return;
+      try {
+        await clearAuthToken();
+      } catch (storageError) {
+        console.error("Failed to clear saved token:", storageError);
       }
 
-      // Keep the saved token if this may be a network/server issue.
-      console.error("Session restoration failed:", error);
       setUser(null);
-      setSessionError(
-        "Unable to verify your session. Check your connection and try again.",
-      );
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +71,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     await saveAuthToken(result.token);
     setUser(result.employee);
-    setSessionError(null);
 
     return result.employee;
   }, []);
@@ -102,11 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await clearAuthToken();
     } finally {
       setUser(null);
-      setSessionError(null);
     }
 
-    // Attempt to revoke the token on the backend.
-    // Local logout must not depend on network availability.
+    // Best-effort server-side revocation; local logout must not depend on it.
     if (token) {
       void logoutRequest(token).catch((error) => {
         console.warn(
@@ -117,21 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const retrySessionRestore = useCallback(async () => {
-    await restoreSession();
-  }, [restoreSession]);
-
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        sessionError,
-        signIn,
-        signOut,
-        retrySessionRestore,
-      }}
-    >
+    <AuthContext.Provider value={{ user, isLoading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

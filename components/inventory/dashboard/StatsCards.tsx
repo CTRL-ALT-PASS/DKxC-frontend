@@ -1,13 +1,21 @@
-import { Pressable, Text, View } from "react-native";
+import type { DailySeriesPoint } from "@/services/dashboardApi";
 import { LinearGradient } from "expo-linear-gradient";
-import { TrendingUp } from "lucide-react-native";
-import MiniChart from "./MiniChart";
-import type { DateRange, Metric } from "./chartData";
+import { ArrowUpRight } from "lucide-react-native";
+import { useMemo } from "react";
+import { Pressable, Text, View } from "react-native";
+import {
+  buildSeries,
+  matchesQuickRange,
+  type DateRange,
+  type Metric,
+} from "./chartData";
+import SparkLine from "./SparkLine";
 
 interface StatsCardsProps {
   grossSales: number;
   grossProfit: number;
   range: DateRange;
+  series: DailySeriesPoint[];
   onExpand: (metric: Metric) => void;
 }
 
@@ -15,101 +23,122 @@ function formatPeso(value: number) {
   return `₱${(value / 1000).toFixed(1)}k`;
 }
 
-// Both cards use the same "selected" treatment (gradient fill, white text) —
-// distinguished from each other by a slightly different green, not by one
-// looking active and the other inactive.
-const CARD_CONFIG: {
-  metric: Metric;
-  label: string;
-  gradient: [string, string];
-  labelColor: string;
-  valueColor: string;
-  barColor: string;
-}[] = [
-  {
-    metric: "sales",
-    label: "Gross Sales",
-    gradient: ["#3F5A4A", "#1F2E24"],
-    labelColor: "#E7EFE9",
-    valueColor: "#FFFFFF",
-    barColor: "#FFFFFF",
-  },
-  {
-    metric: "profit",
-    label: "Gross Profit",
-    gradient: ["#4C6E5A", "#2B4335"],
-    labelColor: "#E7EFE9",
-    valueColor: "#FFFFFF",
-    barColor: "#FFFFFF",
-  },
+// Percent change of the second half of the range vs. the first half.
+function halfOverHalfChange(values: number[]) {
+  const mid = Math.floor(values.length / 2);
+  const sum = (arr: number[]) => arr.reduce((s, v) => s + v, 0);
+  const before = sum(values.slice(0, mid));
+  const after = sum(values.slice(mid));
+  return before === 0 ? 0 : ((after - before) / before) * 100;
+}
+
+const CARDS: { metric: Metric; label: string }[] = [
+  { metric: "sales", label: "Gross Sales" },
+  { metric: "profit", label: "Gross Profit" },
 ];
 
 export default function StatsCards({
   grossSales,
   grossProfit,
   range,
+  series: daily,
   onExpand,
 }: StatsCardsProps) {
+  const series = useMemo(
+    () => ({
+      sales: buildSeries("sales", range, daily).map((p) => p.value),
+      profit: buildSeries("profit", range, daily).map((p) => p.value),
+    }),
+    [range, daily],
+  );
+
   const amounts: Record<Metric, number> = {
     sales: grossSales,
     profit: grossProfit,
   };
 
-  return (
-    <View className="flex-row gap-4">
-      {CARD_CONFIG.map((card) => (
-        <Pressable
-          key={card.metric}
-          onPress={() => onExpand(card.metric)}
-          style={({ pressed }) => ({
-            transform: [{ scale: pressed ? 0.985 : 1 }],
-          })}
-          className="flex-1 overflow-hidden rounded-3xl shadow-md"
-        >
-          <LinearGradient
-            colors={card.gradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ padding: 22, minHeight: 210 }}
-          >
-            <View className="flex-row items-start justify-between">
-              <Text
-                style={{ color: card.labelColor }}
-                className="text-lg font-semibold"
-              >
-                {card.label}
-              </Text>
+  const quick = matchesQuickRange(range);
+  const days =
+    quick?.replace("d", "") ??
+    String(
+      Math.max(
+        1,
+        Math.round((range.end.getTime() - range.start.getTime()) / 86400000),
+      ),
+    );
+  const margin =
+    grossSales > 0 ? ((grossProfit / grossSales) * 100).toFixed(1) : "0.0";
 
-              <View className="items-end">
-                <Text
-                  style={{ color: card.valueColor }}
-                  className="text-4xl font-extrabold"
-                >
-                  {formatPeso(amounts[card.metric])}
-                </Text>
-                <View className="mt-1.5 flex-row items-center gap-1 opacity-70">
-                  <TrendingUp size={13} color={card.valueColor} />
-                  <Text
-                    style={{ color: card.valueColor }}
-                    className="text-xs font-medium"
-                  >
+  const subtitles: Record<Metric, string> = {
+    sales: `${days}-Day Velocity`,
+    profit: `${margin}% Net Margin`,
+  };
+
+  return (
+    // flex-1 lets the row take whatever height the parent gives it;
+    // the cards then stretch to match each other.
+    <View className="flex-1 flex-row gap-4">
+      {CARDS.map((card) => {
+        const change = halfOverHalfChange(series[card.metric]);
+        const up = change >= 0;
+
+        return (
+          <Pressable
+            key={card.metric}
+            onPress={() => onExpand(card.metric)}
+            style={({ pressed }) => ({
+              transform: [{ scale: pressed ? 0.985 : 1 }],
+            })}
+            className="flex-1 overflow-hidden rounded-3xl shadow-md"
+          >
+            <LinearGradient
+              colors={["#4C0519", "#2A030F"]} // secondary -> canvas.mid
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ padding: 20, flex: 1, minHeight: 210 }}
+            >
+              <View className="flex-row items-start justify-between">
+                <View>
+                  <Text className="text-xs font-semibold uppercase tracking-wider text-neutral/80">
+                    {card.label}
+                  </Text>
+                  <Text className="mt-1 text-4xl font-extrabold text-white">
+                    {formatPeso(amounts[card.metric])}
+                  </Text>
+                </View>
+
+                <View className="flex-row items-center gap-1 rounded-full border border-tertiary/40 px-2 py-1">
+                  <ArrowUpRight size={11} color="#FB7185" />
+                  <Text className="text-[10px] font-medium text-tertiary">
                     Tap to expand
                   </Text>
                 </View>
               </View>
-            </View>
 
-            <View className="mt-7">
-              <MiniChart
-                metric={card.metric}
-                range={range}
-                barColor={card.barColor}
-                height={72}
-              />
-            </View>
-          </LinearGradient>
-        </Pressable>
-      ))}
+              <View className="mt-5 flex-row items-center justify-between">
+                <Text className="text-xs font-medium text-tertiary">
+                  {subtitles[card.metric]}
+                </Text>
+                <Text
+                  className={`text-xs font-bold ${up ? "text-success" : "text-tertiary"}`}
+                >
+                  {up ? "▲ +" : "▼ "}
+                  {Math.abs(change).toFixed(1)}%
+                </Text>
+              </View>
+
+              {/* The chart takes all remaining height in the card */}
+              <View className="mt-2 flex-1">
+                <SparkLine
+                  values={series[card.metric]}
+                  fill
+                  gradientId={`spark-${card.metric}`}
+                />
+              </View>
+            </LinearGradient>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { FlatList, View, type FlatListProps } from "react-native";
+import { FlatList, Platform, View, type FlatListProps } from "react-native";
 
 export const PRODUCT_CARD_WIDTH = 160; // keep in sync with the card's w-40
 export const PRODUCT_GRID_GAP = 12;
@@ -32,7 +32,7 @@ export default function ProductGrid<T>({
 
   return (
     <View
-      className="flex-1"
+      className="flex-1 min-h-0"
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
     >
       {containerWidth > 0 && (
@@ -51,7 +51,7 @@ export default function ProductGrid<T>({
               {renderCard(item)}
             </View>
           )}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={Platform.OS === "web"}
           keyboardShouldPersistTaps="handled"
           {...listProps}
         />

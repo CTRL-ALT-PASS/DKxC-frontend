@@ -1,58 +1,193 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+
 import ProductFormScreen, {
-  Option,
-  ProductFormValues,
+  type AddOnOption,
+  type Option,
+  type ProductFormValues,
 } from "../../components/inventory/products/ProductFormScreen";
-import { CATEGORIES, INVENTORY, PRODUCTS } from "../../constants/mockData";
-
-// Adjust the field names below if your mock data differs (assumes INVENTORY items have `id` and `name`).
-const categoryOptions: Option[] = CATEGORIES.filter((c) => c !== "All").map(
-  (c) => ({
-    id: c,
-    label: c,
-  }),
-);
-
-const ingredientOptions: Option[] = INVENTORY.map((i) => ({
-  id: String(i.id),
-  label: i.name,
-}));
+import {
+  toFormValues,
+  toPayload,
+} from "../../components/inventory/products/productFormMapper";
+import { useAddOns } from "../../hooks/use-add-ons";
+import { useCategories } from "../../hooks/use-categories";
+import { useInventoryItems } from "../../hooks/use-inventory-items";
+import { useProduct } from "../../hooks/use-products";
+import { ApiError } from "../../services/apiClient";
+import {
+  createProduct,
+  deleteProduct,
+  deleteProductImage,
+  updateProduct,
+  uploadProductImage,
+} from "../../services/productsApi";
+import { confirm, describeError, notify } from "../../utils/dialogs";
 
 export default function ProductFormRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const isEdit = !!id;
+  const productId = id ? Number(id) : null;
+  const isEdit = productId !== null;
 
-  const initialValues = useMemo<Partial<ProductFormValues> | undefined>(() => {
-    if (!id) return undefined;
-    const product = PRODUCTS.find((p) => String(p.id) === id);
-    if (!product) return undefined;
-    return {
-      name: product.name,
-      categoryId: product.category,
-      price: String(product.price ?? ""),
-      // ingredients / sizes / add-ons will come from the API once the backend is connected
-    };
-  }, [id]);
+  const { categories, loading: catLoading, error: catError } = useCategories();
+  const {
+    items,
+    loading: itemsLoading,
+    error: itemsError,
+  } = useInventoryItems();
+  const { addOns, loading: addOnsLoading, error: addOnsError } = useAddOns();
+  const {
+    product,
+    loading: productLoading,
+    error: productError,
+  } = useProduct(productId);
+
+  const categoryOptions = useMemo<Option[]>(
+    () =>
+      categories.map((c) => ({
+        id: String(c.category_id),
+        label: c.category_name,
+      })),
+    [categories],
+  );
+
+  // `unit` is the base unit: recipe quantities are always stored in it.
+  const ingredientOptions = useMemo<Option[]>(
+    () =>
+      items.map((i) => ({
+        id: String(i.inventory_item_id),
+        label: i.item_name,
+        unit: i.base_unit,
+      })),
+    [items],
+  );
+
+  const addOnOptions = useMemo<AddOnOption[]>(
+    () =>
+      addOns.map((a) => ({
+        id: a.add_on_id,
+        name: a.add_on_name,
+        price: a.price,
+        categoryIds: a.category_ids,
+      })),
+    [addOns],
+  );
+
+  const initialValues = useMemo<Partial<ProductFormValues> | undefined>(
+    () => (product ? toFormValues(product) : undefined),
+    [product],
+  );
+
+  // router.back() throws GO_BACK when there's no history (form opened directly
+  // or the page was reloaded on web), so fall back to the products list.
+  const leaveForm = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(inventory)/products");
+  };
 
   const handleSave = async (values: ProductFormValues) => {
-    console.log(isEdit ? "Update product:" : "New product:", id, values);
-    // TODO: call Laravel API here
-    router.back();
+    // 1) Save the product itself.
+    let savedId: number;
+    try {
+      const payload = toPayload(values);
+      if (isEdit) {
+        await updateProduct(productId, payload);
+        savedId = productId;
+      } else {
+        savedId = (await createProduct(payload)).data.product_id;
+      }
+    } catch (e) {
+      notify("Couldn't save product", describeError(e));
+      return;
+    }
+
+    // 2) The photo has its own endpoint, so it's applied once the product exists.
+    try {
+      const change = values.imageChange;
+      if (change?.type === "upload") {
+        await uploadProductImage(savedId, change.file);
+      } else if (change?.type === "remove") {
+        await deleteProductImage(savedId);
+      }
+    } catch (e) {
+      notify("Product saved, but the photo wasn't", describeError(e));
+      // A new product exists now: switch this screen to edit mode so pressing
+      // Save again updates it instead of creating a duplicate.
+      if (!isEdit) router.setParams({ id: String(savedId) });
+      return;
+    }
+
+    leaveForm(); // the products screen refetches on focus
   };
+
+  const handleDelete = async () => {
+    if (!isEdit) return;
+    const ok = await confirm(
+      "Delete product?",
+      "This also removes its recipe, sizes and add-on settings.",
+      "Delete",
+    );
+    if (!ok) return;
+
+    try {
+      await deleteProduct(productId);
+      leaveForm();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        const discontinue = await confirm(
+          "Can't delete",
+          "This product has sales history. Set it to Discontinued instead?",
+          "Discontinue",
+        );
+        if (discontinue) {
+          try {
+            await updateProduct(productId, { product_status: "Discontinued" });
+            leaveForm();
+          } catch (err) {
+            notify("Couldn't update product", describeError(err));
+          }
+        }
+        return;
+      }
+      notify("Couldn't delete product", describeError(e));
+    }
+  };
+
+  const loading =
+    catLoading || itemsLoading || addOnsLoading || (isEdit && productLoading);
+  const loadError = catError ?? itemsError ?? addOnsError ?? productError;
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <ProductFormScreen
-        mode={isEdit ? "edit" : "new"}
-        initialValues={initialValues}
-        categoryOptions={categoryOptions}
-        ingredientOptions={ingredientOptions}
-        onSave={handleSave}
-        onCancel={() => router.back()}
-      />
+      {loading ? (
+        <View className="flex-1 items-center justify-center bg-neutral">
+          <ActivityIndicator color="#BE185D" />
+        </View>
+      ) : loadError ? (
+        <View className="flex-1 items-center justify-center bg-neutral p-6">
+          <Text className="text-secondary mb-3">{loadError.message}</Text>
+          <Pressable
+            onPress={() => leaveForm()}
+            className="bg-primary rounded-lg px-4 py-2"
+          >
+            <Text className="text-white font-medium">Go back</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <ProductFormScreen
+          mode={isEdit ? "edit" : "new"}
+          initialValues={initialValues}
+          categoryOptions={categoryOptions}
+          ingredientOptions={ingredientOptions}
+          addOns={addOnOptions}
+          onSave={handleSave}
+          onDelete={isEdit ? handleDelete : undefined}
+          onCancel={() => router.replace("/(inventory)/products")}
+        />
+      )}
     </>
   );
 }

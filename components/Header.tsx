@@ -14,14 +14,15 @@ export default function Header({ title, date }: HeaderProps) {
   }
 
   return (
-    <View className="flex-row items-center justify-between bg-cream px-6 py-4 border-b border-slate-200">
-      <Text className="text-xl font-semibold text-slate-800">{title}</Text>
+    <View className="flex-row items-center justify-between bg-neutral px-6 py-4 border-b border-tertiary-soft/40">
+      <Text className="text-xl font-semibold text-secondary">{title}</Text>
 
       <View className="flex-row items-center">
-        <Text className="text-slate-800 mr-4">{date}</Text>
-        <View className="w-px h-5 bg-slate-800 mr-4" />
+        <Text className="text-secondary/70 mr-4">{date}</Text>
+        <View className="w-px h-5 bg-tertiary-soft mr-4" />
 
-        <Text className="text-slate-800 mr-1" numberOfLines={1}>
+        <View className="w-2 h-2 rounded-full bg-success mr-2" />
+        <Text className="text-secondary font-medium" numberOfLines={1}>
           {user.fullname}
         </Text>
       </View>

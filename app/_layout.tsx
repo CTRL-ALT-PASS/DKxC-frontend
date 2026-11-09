@@ -1,50 +1,31 @@
 import { CartProvider } from "@/context/CartContext";
 import "@/global.css";
+import { Stack } from "expo-router";
+import { colorScheme } from "nativewind";
+import { ActivityIndicator, Text, View } from "react-native";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 
-import { Stack } from "expo-router";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+colorScheme.set("light");
 
 function RootNavigator() {
-  const { user, isLoading, sessionError, retrySessionRestore } = useAuth();
+  const { user, isLoading } = useAuth();
 
   // Wait until session restoration finishes.
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#2F5A3F" />
+        <ActivityIndicator size="large" color="#BE185D" />
         <Text className="mt-4 text-slate-600">Restoring session...</Text>
       </View>
     );
   }
 
-  // Don't mistake a network failure for an invalid token.
-  if (sessionError) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="mb-2 text-center text-xl font-bold text-slate-800">
-          Unable to restore session
-        </Text>
-
-        <Text className="mb-6 text-center text-slate-500">
-          Check your connection and confirm that the server is running.
-        </Text>
-
-        <Pressable
-          onPress={() => void retrySessionRestore()}
-          className="rounded-xl bg-darcy px-6 py-3"
-        >
-          <Text className="font-semibold text-white">Try Again</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  const isManager = user?.role.toLowerCase() === "manager";
   const isAuthenticated = user !== null;
+  const isManager = user?.role?.toLowerCase() === "manager";
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
       {/* Only unauthenticated users can access login. */}
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="login" />
