@@ -22,7 +22,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/darcys-logo-light.png"
     },
     "plugins": [

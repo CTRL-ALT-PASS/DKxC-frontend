@@ -1,9 +1,11 @@
 import { CartProvider } from "@/context/CartContext";
 import "@/global.css";
+import { Stack } from "expo-router";
+import { colorScheme } from "nativewind";
+import { ActivityIndicator, Text, View } from "react-native";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 
-import { Stack } from "expo-router";
-import { ActivityIndicator, Text, View } from "react-native";
+colorScheme.set("light");
 
 function RootNavigator() {
   const { user, isLoading } = useAuth();
@@ -18,11 +20,12 @@ function RootNavigator() {
     );
   }
 
-  const isManager = user?.role.toLowerCase() === "manager";
   const isAuthenticated = user !== null;
+  const isManager = user?.role?.toLowerCase() === "manager";
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
       {/* Only unauthenticated users can access login. */}
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="login" />

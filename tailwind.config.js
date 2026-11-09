@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: [
     "./app/**/*.{js,jsx,ts,tsx}",
     "./components/**/*.{js,jsx,ts,tsx}",
@@ -16,10 +17,10 @@ module.exports = {
         warn: "#DC2626",
 
         // New, reusable on other pages
-        canvas: { DEFAULT: "#1A0208", mid: "#2A030F" }, // dark page backgrounds
-        field: "#3A1220", // input / card surface on dark backgrounds
+        canvas: { DEFAULT: "#1A0208", mid: "#2A030F" },
+        field: "#3A1220",
         success: { DEFAULT: "#34D399", dark: "#065F46" },
-        
+
         // Previous (green) version, kept so other screens don't break
         darcy: { DEFAULT: "#1F3D2B", dark: "#14291C", light: "#2F5A3F" },
         cream: "#F5F1E8",
